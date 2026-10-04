@@ -1,6 +1,6 @@
 # TODO
 
-Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**; prossimo: M2.
+Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**; M2 quasi fatto (vedi sotto).
 
 ## 0. Pulizia — fatto (2026-10-04, sera)
 
@@ -38,15 +38,21 @@ Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**;
       (`tools/m1check.sh`), screenshot a 4,000 s identico (0 pixel diversi).
 - Velocità: 4 s emulati in 0,8 s (CPI 6), circa 5× il tempo reale.
 
-## M2: prossimo passo
+## M2 — in corso (2026-10-05, notte)
 
-- [ ] **CD servo** (`spg290_cdservo.cpp`): le tracce restano identiche fino
-      all'istruzione ~126,6 M (≈7 s), poi divergono alla prima lettura di
-      `0x8806000c` (MAME 0, il nostro stub restituisce il valore scritto). Riferimento
-      a 180 M istruzioni (10 s, 4 GB) in `dumps/ref/bios-boot-180M.trace`.
-- [ ] Poi immagini disco (cue/bin, iso), I2C e pad da tastiera, PPU completa: X-Men e IWL
-      giocabili muti; catalogo dei servizi BIOS dalle tracce.
-- [ ] Spider-Man (quarto titolo): legge i file senza le voci open/read/close; capire come.
+- [x] CD servo (port), immagini cue a file singolo e ISO identiche a `cdrom_file` di MAME.
+- [x] SPU (port del nostro device): DAC FIFO a timer, 24 voci, audio SDL.
+- [x] Lettore RFID (port), `--card`; X-Men arriva al combattimento con Wolverine.
+- [x] Tracce sparse (`file:N:K[:FROM]`) da entrambi i lati; `tools/regress.sh` =
+      M1 + X-Men/Spider-Man/Marvel Heroes 60 s + IWL 90 s, tutti identici a MAME.
+- [x] Pannello carte (F1/F2), catalogo di 445 carte da MAME (CC0), salvataggi in `cards/`.
+- [ ] Ben 10 (`J:/.../roms/Ben 10 (USA) (USE2).cue`, volume `BT_V1_0_USE2`) e il dump
+      vero di X-Men USE2 (bin/cue): aggiungerli a `tools/games.sh` e registrare i riferimenti.
+- [ ] Parità con input: i tasti iniettati in MAME via Lua cadono ai confini di frame,
+      i nostri `--input` a tempi in secondi; serve un formato comune (frame o ciclo).
+- [ ] Spider-Man: legge i file senza le voci open/read/close; capire come (tracce).
+- [ ] Catalogo dei 29 servizi BIOS con nomi e firme dalle tracce (serve a M5).
+- [ ] Prestazioni: timer analitici invece di un evento per tick (oggi ~3x tempo reale).
 
 ## Più avanti (da RECON.md)
 
