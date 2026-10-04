@@ -14,5 +14,7 @@ int card_loaded(void);
 void card_reset(void);
 void card_write(int state);         /* GPIO bit 1 */
 int card_read(void);
+void card_report(FILE *f);         /* pulse-width statistics */
+extern int g_card_scaled;           /* decode pulses relative to the start pulse */
 
 #endif

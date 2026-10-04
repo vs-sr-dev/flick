@@ -46,12 +46,25 @@ independent project, not affiliated with Mattel or Sunplus.
 | `--screenshot FILE` | save the last frame as PNG on exit |
 | `--trace FILE[:N[:K[:FROM]]]` | trace the first N instructions (default 50M), same format as the MAME fork; with K > 0 a sparse trace (I/O, interrupts, a register hash every K instructions, full lines from FROM on) |
 | `--input SPEC` | scripted presses, `T:button[:dur][@pad],...` with times in seconds |
-| `--cpi N` | cycles per instruction (default 6, as MAME) |
+| `--timing fast\|mame` | timing model (default `fast`, see below); `--trace` forces `mame` |
+| `--cpi N` | cycles per instruction, overriding the preset |
 | `--log-uart` | print the BIOS debug UART on stderr |
 | `-v` | verbose log |
 
 Keys: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
-A/S = shoulders, Q/W = triggers, Esc = quit.
+A/S = shoulders, Q/W = triggers, F1 = cards, F2 = take the card off, F3 = switch timing,
+Esc = quit.
+
+### Timing
+
+MAME charges 6 cycles to every instruction and gives one PPU vblank per frame in the
+interlaced video modes, so X-Men fights at 15 fps. The default `fast` preset charges 1
+cycle per instruction and raises a vblank per field: X-Men fights at 60 fps. It also
+decodes the card reader's pulses by their ratios rather than MAME's absolute widths, which
+only work at 6 cycles per instruction, and fast-forwards idle loops (exactly: whole
+iterations, never past the next event). `--timing mame` (or F3 in the window) gives
+MAME's behaviour back, cycle for cycle. Fitting the timing to the real console is
+milestone M4.
 
 ### Character cards
 

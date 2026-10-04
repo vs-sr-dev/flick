@@ -277,6 +277,11 @@ static void stream_update(void)
 	}
 }
 
+void spu_sync(void)
+{
+	stream_update();
+}
+
 uint32_t spu_take(int16_t *dst, uint32_t max_frames)
 {
 	uint32_t n = 0;

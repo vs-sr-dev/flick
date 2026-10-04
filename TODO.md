@@ -52,7 +52,13 @@ Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**;
       i nostri `--input` a tempi in secondi; serve un formato comune (frame o ciclo).
 - [ ] Spider-Man: legge i file senza le voci open/read/close; capire come (tracce).
 - [ ] Catalogo dei 29 servizi BIOS con nomi e firme dalle tracce (serve a M5).
-- [ ] Prestazioni: timer analitici invece di un evento per tick (oggi ~3x tempo reale).
+- [x] Prestazioni: timer analitici (un evento per overflow invece che per tick, traccia
+      identica), skip esatto dei loop d'attesa. X-Men in combattimento a CPI 1: 150%.
+- [x] Preset `--timing fast` (predefinito): CPI 1, vblank per semiquadro, decoder della carta
+      per rapporti (il BIOS tara i suoi loop al boot: le larghezze assolute dipendono dal
+      CPI, i rapporti no). X-Men 60 fps. F3 alterna con `mame`. Da verificare sui video
+      reali: è M4.
+- [x] Audio: il frontend usa la coda audio come orologio (60 ms), niente più scatti attesi.
 
 ## Più avanti (da RECON.md)
 

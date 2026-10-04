@@ -17,8 +17,11 @@
 #include "score7.h"
 #include "bus.h"
 #include "trace.h"
+#include "sched.h"
 
 score7_t g_cpu;
+uint32_t g_mark_pc = 1;      /* odd: never matches */
+uint64_t g_mark_count;
 
 #define m_pc    g_cpu.pc
 #define m_ppc   g_cpu.ppc
@@ -146,9 +149,9 @@ static inline int32_t sext(uint32_t v, int width)
 static inline uint8_t read_byte(uint32_t a)        { return bus_read8(a); }
 static inline uint16_t read_word(uint32_t a)       { return bus_read16(a & ~1u); }
 static inline uint32_t read_dword(uint32_t a)      { return bus_read32(a & ~3u); }
-static inline void write_byte(uint32_t a, uint8_t d)   { bus_write8(a, d); }
-static inline void write_word(uint32_t a, uint16_t d)  { bus_write16(a & ~1u, d); }
-static inline void write_dword(uint32_t a, uint32_t d) { bus_write32(a & ~3u, d); }
+static inline void write_byte(uint32_t a, uint8_t d)   { g_cpu.stores++; bus_write8(a, d); }
+static inline void write_word(uint32_t a, uint16_t d)  { g_cpu.stores++; bus_write16(a & ~1u, d); }
+static inline void write_dword(uint32_t a, uint32_t d) { g_cpu.stores++; bus_write32(a & ~3u, d); }
 
 
 /* ------------------------------------------------------------------------ */
@@ -1296,6 +1299,38 @@ static const op_handler s_opcode16_table[8] =
 	op_rform1, op_undef, op_rform2, op_jform, op_branch16, op_ldiu, op_iform1a, op_iform1b
 };
 
+/* Idle-loop skip. A backward branch that comes back to the same loop head with every
+ * register unchanged, and no store or I/O access in between, repeats forever until an
+ * event: memory and registers are the same at each iteration. Whole iterations are skipped
+ * up to the next event (never past it), so the resulting state and timing are exactly
+ * those of executing the loop. Off while tracing, as it changes instruction counts. */
+#define LOOP_REGS (sizeof(g_cpu.gpr) + sizeof(g_cpu.cr) + sizeof(g_cpu.sr) + sizeof(g_cpu.ce))
+static uint32_t s_loop_pc = 1;
+static uint64_t s_loop_cycles, s_loop_stores, s_loop_io;
+static uint32_t s_loop_regs[LOOP_REGS / 4];
+
+static void idle_check(void)
+{
+	if (s_loop_pc == m_pc && s_loop_stores == g_cpu.stores && s_loop_io == g_cpu.io_total
+		&& !(g_cpu.pending && (REG_PSR & 1))
+		&& !memcmp(s_loop_regs, g_cpu.gpr, LOOP_REGS))
+	{
+		const uint64_t period = g_cpu.cycles - s_loop_cycles;
+		const uint64_t target = g_next_event_cycle;
+		if (period && target != UINT64_MAX && target > g_cpu.cycles)
+		{
+			const uint64_t k = (target - g_cpu.cycles) / period;
+			g_cpu.cycles += k * period;
+			g_cpu.idle_skipped += k;
+		}
+	}
+	s_loop_pc = m_pc;
+	s_loop_cycles = g_cpu.cycles;
+	s_loop_stores = g_cpu.stores;
+	s_loop_io = g_cpu.io_total;
+	memcpy(s_loop_regs, g_cpu.gpr, LOOP_REGS);
+}
+
 void score7_reset(void)
 {
 	memset(&g_cpu, 0, sizeof(g_cpu));
@@ -1359,7 +1394,17 @@ void score7_step(void)
 			break;
 	}
 
-	g_cpu.cycles += g_cpu.cpi;  // FIXME (MAME): if available use correct cycles per instructions
+	// FIXME (MAME): if available use correct cycles per instructions
+	g_cpu.cycles += g_cpu.cpi;
+	if (g_cpu.io_count)
+	{
+		g_cpu.cycles += (uint64_t)g_cpu.io_cycles * g_cpu.io_count;
+		g_cpu.io_total += g_cpu.io_count;
+		g_cpu.io_count = 0;
+	}
+	if (ipc == g_mark_pc) g_mark_count++;
+	if (g_cpu.idle_skip && m_pc < ipc && ipc - m_pc <= 64 && !g_trace)
+		idle_check();
 
 	if (g_trace)
 		trace_end(ipc, form == 0 ? ((ipc & 2) ? op >> 16 : op) : op, form == 0);

@@ -11,9 +11,16 @@ typedef struct score7 {
 	uint64_t pending;                         /* interrupt requests, bit = vector */
 	uint64_t cycles;                          /* total cycles at the current instruction start */
 	int cpi;                                  /* cycles charged per instruction */
+	int io_cycles;                            /* extra cycles per I/O access (0: as MAME) */
+	int io_count;                             /* I/O accesses of the current instruction */
+	/* timing model beyond MAME (all off by default = MAME's behaviour) */
+	int idle_skip;                            /* fast-forward provably idle loops */
+	uint64_t stores, io_total, idle_skipped;  /* bookkeeping for idle_skip */
 } score7_t;
 
 extern score7_t g_cpu;
+extern uint32_t g_mark_pc;        /* debug: count passes through this PC */
+extern uint64_t g_mark_count;
 
 void score7_reset(void);
 void score7_step(void);           /* one instruction (or interrupt entry + one instruction) */

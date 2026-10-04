@@ -12,5 +12,5 @@ EMU=build/hyperscanemu.exe
 mkdir -p dumps
 "$EMU" --bios "$BIOS" --headless --trace dumps/ours-72M.trace:72000000
 bash tools/tracediff.sh dumps/ref/bios-boot-72M.trace dumps/ours-72M.trace
-"$EMU" --bios "$BIOS" --headless --seconds 4 --screenshot dumps/ours-logo-4s.png
+"$EMU" --bios "$BIOS" --headless --timing mame --seconds 4 --screenshot dumps/ours-logo-4s.png
 "$PY" tools/pngdiff.py dumps/ref/bios-logo-4s.png dumps/ours-logo-4s.png

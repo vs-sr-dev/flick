@@ -40,6 +40,7 @@ uint32_t tv_start_addr_r(int n);
 void tv_start_addr_w(int n, uint32_t data, uint32_t mask);
 extern uint32_t g_frame[480][640];   /* last completed frame, 0x00RRGGBB */
 extern uint64_t g_frame_count;
+extern int g_field_vblank;           /* timing experiment: PPU vblank per field (interlaced) */
 extern void (*g_on_frame)(void);     /* frontend hook, called at each vblank start */
 
 /* ppu.c */

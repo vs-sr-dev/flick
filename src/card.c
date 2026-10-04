@@ -43,6 +43,33 @@ static int m_resp_len;
 static uint16_t m_resp_idx;
 static atto_t m_last_at;
 
+/* Scale-free pulse decoding (not in MAME). The BIOS times the pulses with delay loops it
+ * calibrates at boot plus a part that scales with the CPU's speed, so their absolute width
+ * depends on the timing model, while their ratios do not: start pulse : "0" : "1" : strobe
+ * stay about 5.7 : 1 : 3 : 10. With the start pulse of the session as the reference, the
+ * classes are those of MAME's absolute thresholds at CPI 6, and any CPI works. */
+int g_card_scaled;
+static int s_expect_start;
+static int s_start = 1022;                  /* CPI 6 value until a session starts */
+
+/* pulse statistics for timing experiments: count, min, max carrier clocks per class */
+static struct { uint64_t n; int lo, hi; } s_stat[3] = { { 0, 1 << 30, 0 }, { 0, 1 << 30, 0 }, { 0, 1 << 30, 0 } };
+
+static void stat(int cls, int clk)
+{
+	s_stat[cls].n++;
+	if (clk < s_stat[cls].lo) s_stat[cls].lo = clk;
+	if (clk > s_stat[cls].hi) s_stat[cls].hi = clk;
+}
+
+void card_report(FILE *f)
+{
+	static const char *const name[3] = { "0 (<500)", "1 (500-999)", "strobe (1000-4999)" };
+	for (int i = 0; i < 3; i++)
+		if (s_stat[i].n)
+			fprintf(f, "card pulses %-18s %8llu  clocks %d-%d\n", name[i], (unsigned long long)s_stat[i].n, s_stat[i].lo, s_stat[i].hi);
+}
+
 int card_load(const char *path)
 {
 	FILE *f = fopen(path, "rb");
@@ -63,6 +90,8 @@ void card_reset(void)
 	m_cmd_len = m_resp_len = 0;
 	m_resp_idx = 0;
 	m_last_at = 0;
+	s_expect_start = 0;
+	s_start = 1022;
 }
 
 static uint16_t calc_crc(const uint8_t *data, int len)
@@ -175,11 +204,34 @@ void card_write(int state)
 	m_last_at = now;
 
 	if (state)
-		return;
-
-	if (clk < 1000)
 	{
-		if (clk < 500)
+		/* a long low phase is the reader being powered up: the next pulse is the session's
+		 * start pulse, the reference for the scale-free decoder */
+		if (g_card_scaled && clk > 100000)
+			s_expect_start = 1;
+		return;
+	}
+
+	/* pulse class: 0, 1, 2 = strobe, -1 = ignored */
+	int cls;
+	if (!g_card_scaled)                         /* MAME's thresholds (tuned to CPI 6) */
+		cls = clk < 500 ? 0 : clk < 1000 ? 1 : clk < 5000 ? 2 : -1;
+	else if (s_expect_start)
+	{
+		s_start = clk;
+		s_expect_start = 0;
+		cls = 2;
+	}
+	else                                        /* relative to the start pulse S: 0 ~0.18 S, */
+	{                                           /* 1 ~0.53 S, strobe ~1.8 S, gaps ~50 S */
+		const double r = (double)clk / s_start;
+		cls = r < 0.33 ? 0 : r < 1.0 ? 1 : r < 4.9 ? 2 : -1;
+	}
+
+	if (cls == 0 || cls == 1)
+	{
+		stat(cls, clk);
+		if (cls == 0)
 			m_data &= ~(1 << m_bit_pos);
 		else
 			m_data |= 1 << m_bit_pos;
@@ -197,8 +249,9 @@ void card_write(int state)
 			check_command();
 		}
 	}
-	else if (clk < 5000)
+	else if (cls == 2)
 	{
+		stat(2, clk);
 		m_bit_pos = 0;
 		m_data = 0;
 		if (m_resp_idx <= m_resp_len * 2)

@@ -12,7 +12,8 @@
 static int s_width, s_height, s_vis_w, s_vis_h;
 static atto_t s_frame_period, s_scantime, s_pixeltime, s_vblank_period;
 static atto_t s_vblank_start_time, s_vblank_end_time;
-static emu_timer *s_vbl_begin, *s_vbl_end;
+static emu_timer *s_vbl_begin, *s_vbl_end, *s_field;
+int g_field_vblank;
 
 static uint16_t s_tve_control;
 static uint8_t s_tve_fade_offset;
@@ -103,6 +104,13 @@ static void vblank_end(void *ctx, int param)
 	g_frame_count++;
 }
 
+static void field_vblank(void *ctx, int param)
+{
+	(void)ctx; (void)param;
+	ppu_screen_vblank(1);
+	ppu_screen_vblank(0);
+}
+
 static void vblank_begin(void *ctx, int param)
 {
 	(void)ctx; (void)param;
@@ -113,6 +121,10 @@ static void vblank_begin(void *ctx, int param)
 	if (g_on_frame) g_on_frame();
 
 	ppu_screen_vblank(1);
+
+	/* timing experiment (not in MAME): a PPU vblank per field in interlaced modes */
+	if (g_field_vblank && (s_tve_control & 1))
+		timer_adjust(s_field, s_frame_period / 2, 0, 0);
 
 	timer_adjust(s_vbl_begin, time_until_vblank_start(), 0, 0);
 
@@ -144,6 +156,7 @@ void screen_init(void)
 {
 	s_vbl_begin = timer_alloc(vblank_begin, NULL, "vblank_begin");
 	s_vbl_end = timer_alloc(vblank_end, NULL, "vblank_end");
+	s_field = timer_alloc(field_vblank, NULL, "field_vblank");
 	s_vblank_start_time = 0;
 	/* set_raw(27_MHz_XTAL, 858, 0, 640, 525, 0, 480) */
 	screen_configure(858, 525, 640, 480, PIXEL_ATTO * 858 * 525);

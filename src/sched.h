@@ -28,6 +28,7 @@ void timer_adjust(emu_timer *t, atto_t delay, int param, atto_t period);
 void timer_disable(emu_timer *t);
 
 atto_t sched_time(void);        /* MAME's machine().time() for the current context */
+int sched_in_callback(void);    /* 1 inside a timer callback, 0 in CPU context */
 extern uint64_t g_next_event_cycle;   /* CPU runs while cycles < this */
 void sched_fire_due(void);      /* fire every timer due at the CPU's current cycle */
 

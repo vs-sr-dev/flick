@@ -33,6 +33,11 @@ emu_timer *timer_alloc(timer_cb cb, void *ctx, const char *name)
 	return t;
 }
 
+int sched_in_callback(void)
+{
+	return s_cb_timer != NULL;
+}
+
 atto_t sched_time(void)
 {
 	if (s_cb_timer) return s_cb_time;

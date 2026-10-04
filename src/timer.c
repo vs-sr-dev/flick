@@ -1,8 +1,13 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco
 /* SPG290 timers - port of MAME's spg290_timer.cpp and the driver's timers_clk_sel_w.
- * As in MAME, every timer tick is a scheduler event (up to 27 MHz in theory, 1 MHz as the
- * BIOS programs it); an analytic version can replace it once the trace-diff passes. */
+ *
+ * MAME ticks each timer with a scheduler event per counter clock (1 MHz as the BIOS sets
+ * it up). Here the counter is advanced arithmetically when the CPU touches the timer, and
+ * the only event is the overflow that raises the IRQ. Ticks happen at exactly the same
+ * times as MAME's periodic timer (start + k * period, period = 1e18 / clock attoseconds),
+ * a tick counts as past for an instruction when MAME would have fired it before that
+ * instruction, so the IRQs land on the same instructions. */
 #include "devices.h"
 #include "sched.h"
 #include "score7.h"
@@ -11,59 +16,100 @@ typedef struct {
 	int enabled;
 	uint32_t control, control2, preload, counter, ccp, upcount;
 	uint32_t clock;
-	emu_timer *tick;
+	atto_t t0, period;       /* tick k (k >= 1) is at t0 + k * period */
+	uint64_t next_k;         /* first tick not yet applied */
+	emu_timer *ovf;          /* event at the next IRQ-raising overflow */
 } spg_timer;
 
 static spg_timer s_t[6];
 static uint16_t s_clk_sel;
+static atto_t s_aps;
 
-static void tick(void *ctx, int param)
+/* latest time whose ticks have happened, seen from the current context: in a scheduler
+ * callback its own time; for the CPU, every event MAME fires before the instruction at
+ * cycle c, i.e. those at T < (c + 1) * aps */
+static atto_t horizon(void)
 {
-	spg_timer *t = ctx;
-	(void)param;
+	const atto_t now = sched_time();
+	return sched_in_callback() ? now : now + s_aps - 1;
+}
+
+static void advance(spg_timer *t, atto_t h)
+{
+	if (!t->enabled || t->t0 + (atto_t)t->next_k * t->period > h)
+		return;
+	uint64_t n = (uint64_t)((h - t->t0) / t->period) - t->next_k + 1;   /* ticks due */
+	t->next_k += n;
+
 	if (!(t->control >> 31))
 		return;
+	if ((t->control2 >> 30) & 3)
+		hs_fatal("unemulated timer mode %u", (t->control2 >> 30) & 3);
 
-	switch ((t->control2 >> 30) & 0x03)
+	while (n)
 	{
-	case 0: // Timer Mode
-		if (t->counter == 0xffff)
+		const uint64_t to_top = 0xffff - (t->counter & 0xffff);    /* increments before 0xffff */
+		if (n <= to_top)
 		{
-			t->counter = t->preload & 0xffff;
-			if ((t->control >> 27) & 1)
-			{
-				t->control |= 0x04000000;
-				score7_set_input(IRQ_TIMER);
-			}
+			t->counter += (uint32_t)n;
+			return;
 		}
-		else
-			t->counter++;
-		break;
-	case 1: hs_fatal("unemulated timer Capture Mode");
-	case 2: hs_fatal("unemulated timer Comparison Mode");
-	case 3: hs_fatal("unemulated timer PWM Mode");
+		n -= to_top + 1;                                        /* the tick at 0xffff reloads */
+		t->counter = t->preload & 0xffff;
+		if ((t->control >> 27) & 1)
+		{
+			t->control |= 0x04000000;
+			score7_set_input(IRQ_TIMER);
+		}
+		else if (n)                                             /* no IRQ: skip whole periods */
+		{
+			const uint64_t p = 0x10000 - (t->preload & 0xffff);
+			n %= p;
+		}
 	}
 }
 
-static void clock_changed(spg_timer *t)
+static void reschedule(spg_timer *t)
 {
-	if (t->enabled)
+	if (!t->enabled || !(t->control >> 31) || !((t->control >> 27) & 1) || ((t->control2 >> 30) & 3))
 	{
-		atto_t p = hz_to_atto(t->clock);    /* attotime::from_hz(u32) */
-		timer_adjust(t->tick, p, 0, p);
+		timer_disable(t->ovf);
+		return;
 	}
-	else
-		timer_disable(t->tick);
+	const uint64_t k = t->next_k + (0xffff - (t->counter & 0xffff));
+	timer_adjust(t->ovf, t->t0 + (atto_t)k * t->period - sched_time(), 0, 0);
+}
+
+static void sync(spg_timer *t)
+{
+	advance(t, horizon());
+}
+
+static void ovf_event(void *ctx, int param)
+{
+	spg_timer *t = ctx;
+	(void)param;
+	sync(t);
+	reschedule(t);
+}
+
+static void restart(spg_timer *t)
+{
+	/* device_clock_changed: adjust(from_hz(clock), 0, from_hz(clock)) from now */
+	t->t0 = sched_time();
+	t->period = hz_to_atto(t->clock);
+	t->next_k = 1;
 }
 
 void timers_init(void)
 {
+	s_aps = hz_to_atto(CPU_CLOCK);
 	for (int i = 0; i < 6; i++)
 	{
 		spg_timer *t = &s_t[i];
 		*t = (spg_timer){ 0 };
 		t->clock = XTAL_27M;
-		t->tick = timer_alloc(tick, t, "timer");
+		t->ovf = timer_alloc(ovf_event, t, "timer");
 	}
 	s_clk_sel = 0;
 }
@@ -71,19 +117,22 @@ void timers_init(void)
 void timer_control_w(int n, uint32_t data)
 {
 	spg_timer *t = &s_t[n];
+	sync(t);
 	int enabled = data & 1;
 	if (t->enabled != enabled)
 	{
 		t->enabled = enabled;
-		clock_changed(t);
+		if (enabled) restart(t);
 	}
 	if (data & 2)
 		t->counter = t->preload & 0xffff;
+	reschedule(t);
 }
 
 uint32_t timer_read(int n, uint32_t off)
 {
 	spg_timer *t = &s_t[n];
+	sync(t);                     /* the IRQ flag in control may have been set by now */
 	switch (off)
 	{
 	case 0x00: return t->control;
@@ -99,6 +148,7 @@ uint32_t timer_read(int n, uint32_t off)
 void timer_write(int n, uint32_t off, uint32_t data, uint32_t mask)
 {
 	spg_timer *t = &s_t[n];
+	sync(t);
 	switch (off)
 	{
 	case 0x00:
@@ -112,6 +162,7 @@ void timer_write(int n, uint32_t off, uint32_t data, uint32_t mask)
 	case 0x10: COMBINE(t->upcount, data, mask); break;
 	default: hs_log("timer%d: unknown write %x = %x\n", n, off, data);
 	}
+	reschedule(t);
 }
 
 uint32_t timers_clk_sel_r(void)
@@ -128,11 +179,14 @@ void timers_clk_sel_w(uint32_t data, uint32_t mask)
 	uint32_t m = 0x100;
 	for (int i = 0; i < 6; i++, m <<= 1)
 	{
+		spg_timer *t = &s_t[i];
 		const uint32_t c = (data & m) ? 32768 : clock;
-		if (c != s_t[i].clock)              /* device_t::set_unscaled_clock: no change, no notify */
+		if (c != t->clock)              /* device_t::set_unscaled_clock: no change, no notify */
 		{
-			s_t[i].clock = c;
-			clock_changed(&s_t[i]);
+			sync(t);
+			t->clock = c;
+			if (t->enabled) restart(t);
+			reschedule(t);
 		}
 	}
 }
