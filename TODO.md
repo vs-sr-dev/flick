@@ -1,7 +1,6 @@
-# TODO: prossima sessione
+# TODO
 
-Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04, completa). Si parte con **M1: il BIOS
-arriva al logo**.
+Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**; prossimo: M2.
 
 ## 0. Pulizia — fatto (2026-10-04, sera)
 
@@ -25,25 +24,29 @@ arriva al logo**.
 - Note per il port: al reset MAME mette `cr29 = 0x20000000` (JTAG off, nel driver) e
   `cr3 = EXCPVEC = 0x9F000000`; tutti gli altri registri a zero.
 
-## 2. Scheletro del progetto
+## 2-3. Scheletro e M1 — fatto (2026-10-04, sera)
 
-- [ ] CMake + Ninja, C99, SDL2 (opzionale in headless), MSYS2 mingw64; build da PowerShell.
-- [ ] `README.md` (stato, legale: niente BIOS e dischi nel repo), `LICENSE` (MIT),
-      `THIRD_PARTY_NOTICES.md` (BSD-3 per il codice da MAME: Sandro Ronco e altri autori).
-- [ ] CLI: `--bios`, `--headless --frames N`, `--screenshot`, `--trace`, `--cpi`.
+- [x] CMake + Ninja, C99 (+ `unsigned __int128` per il tempo esatto), SDL2 opzionale;
+      README, LICENSE (MIT), THIRD_PARTY_NOTICES (BSD-3 per i port da MAME).
+- [x] CLI: `--bios`, `--headless`, `--seconds`, `--frames`, `--screenshot`, `--trace`,
+      `--cpi`, `--log-uart`, `-v`. Finestra SDL in tempo reale (ESC esce).
+- [x] `score7.c` (port 1:1), `sched.c` (regole del `device_scheduler`: tempo CPU =
+      cicli × aps troncato, un evento a T è visibile dalla prima istruzione con
+      ciclo ≥ floor(T/aps)), `bus.c`, `timer.c` (un evento per tick, come MAME),
+      `i2c.c` + pad, `screen.c` (timing di `screen_device`, TV, fade), `ppu.c`.
+- [x] **Criteri di uscita superati**: traccia di 72 M istruzioni identica al byte
+      (`tools/m1check.sh`), screenshot a 4,000 s identico (0 pixel diversi).
+- Velocità: 4 s emulati in 0,8 s (CPI 6), circa 5× il tempo reale.
 
-## 3. M1 vero e proprio
+## M2: prossimo passo
 
-- [ ] `score7.c`: port dell'interprete da MAME `score.cpp` (con le nostre rotate),
-      `m_icount` sostituito da un contatore di cicli con `--cpi` (default 6 per il diff).
-- [ ] Gestione eccezioni/IRQ come MAME (`EXCPVEC`, PSR, vettori), reset a `0x9F000000`.
-- [ ] `bus.c`: SDRAM 16 MB con mirror, SRAM interna 16 KB, flash 1 MB su `0x10000000-0x1FFFFFFF`,
-      MMIO non mappato = ultimo valore scritto + log.
-- [ ] `timer.c` (6 timer, `P_TIMER_CLK_SEL`, IRQ 56), `uart.c` (TX su log), stub CKG/MIU/SFTCFG
-      (`0x0807006C` = SDRAM in self-refresh, come MAME).
-- [ ] PPU e TV minimi per il logo (layer bitmap, palette, fade) + vblank IRQ 53.
-- [ ] Criteri di uscita: trace-diff identico sulle prime 72 M istruzioni (`cmp` con
-      `dumps/ref/bios-boot-72M.trace`); screenshot a 4,000 s identico a `bios-logo-4s.png`.
+- [ ] **CD servo** (`spg290_cdservo.cpp`): le tracce restano identiche fino
+      all'istruzione ~126,6 M (≈7 s), poi divergono alla prima lettura di
+      `0x8806000c` (MAME 0, il nostro stub restituisce il valore scritto). Riferimento
+      a 180 M istruzioni (10 s, 4 GB) in `dumps/ref/bios-boot-180M.trace`.
+- [ ] Poi immagini disco (cue/bin, iso), I2C e pad da tastiera, PPU completa: X-Men e IWL
+      giocabili muti; catalogo dei servizi BIOS dalle tracce.
+- [ ] Spider-Man (quarto titolo): legge i file senza le voci open/read/close; capire come.
 
 ## Più avanti (da RECON.md)
 
