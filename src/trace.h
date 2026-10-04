@@ -6,7 +6,10 @@
  *   L <line> c=<cycles>              interrupt line asserted
  *   I <line> c=<cycles> / X <cause>  interrupt / exception taken (before the line of the
  *                                    instruction it happened in)
- *   E n=<insns> c=<cycles> <regs>    state after the last instruction */
+ *   C n=<insns> pc=<next pc> h=<hash>  sparse checkpoint (FNV-1a of all registers)
+ *   E n=<insns> c=<cycles> <regs>    state after the last instruction
+ * Spec "file[:N[:K[:FROM]]]": with K > 0 the trace is sparse (instruction lines only from
+ * FROM on, a checkpoint every K instructions, I/O and interrupt lines always). */
 #ifndef HS_TRACE_H
 #define HS_TRACE_H
 
@@ -15,7 +18,7 @@
 extern FILE *g_trace;        /* NULL when tracing is off */
 extern int g_trace_done;     /* set when the instruction limit is reached */
 
-int trace_open(const char *spec);   /* "file[:N]" */
+int trace_open(const char *spec);   /* "file[:N[:K[:FROM]]]" */
 void trace_printf(const char *fmt, ...);
 void trace_begin(void);
 void trace_end(uint32_t pc, uint32_t op, int op16);

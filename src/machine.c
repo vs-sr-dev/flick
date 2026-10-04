@@ -10,13 +10,12 @@
 #include "sched.h"
 #include "score7.h"
 #include "trace.h"
+#include "cdservo.h"
+#include "spu.h"
 
 int g_log_uart;
 volatile int g_quit;
 
-/* placeholders until the SPU and CD servo ports (M2/M3): plain register files */
-static uint32_t s_spu_regs[0x10000 / 4];
-static uint32_t s_cd_regs[0x10000 / 4];
 static uint16_t s_gpio_out;
 
 int machine_load_bios(const char *path)
@@ -37,12 +36,8 @@ uint32_t io_read32(uint32_t a, uint32_t mask)
 	{
 	case 0x08010000: return ppu_read(off);
 	case 0x08030000: return tv_read(off);
-	case 0x08050000:
-		hs_log("spu: read %x (not emulated yet)\n", off);
-		return s_spu_regs[off >> 2];
-	case 0x08060000:
-		hs_log("cdservo: read %x (not emulated yet)\n", off);
-		return s_cd_regs[off >> 2];
+	case 0x08050000: return spu_read(off);
+	case 0x08060000: return cdservo_read(off);
 	case 0x08070000:
 		if (off < 0x0c) return tv_start_addr_r(off >> 2);
 		if (off == 0x6c) return 0x01;        // MIU status: SDRAM is in self-refresh mode
@@ -70,8 +65,8 @@ void io_write32(uint32_t a, uint32_t data, uint32_t mask)
 	{
 	case 0x08010000: ppu_write(off, data, mask); return;
 	case 0x08030000: tv_write(off, data, mask); return;
-	case 0x08050000: COMBINE(s_spu_regs[off >> 2], data, mask); return;
-	case 0x08060000: COMBINE(s_cd_regs[off >> 2], data, mask); return;
+	case 0x08050000: spu_write(off, data, mask); return;
+	case 0x08060000: cdservo_write(off, data, mask); return;
 	case 0x08070000:
 		if (off < 0x0c) tv_start_addr_w(off >> 2, data, mask);
 		return;
@@ -95,12 +90,10 @@ void io_write32(uint32_t a, uint32_t data, uint32_t mask)
 	}
 }
 
-void machine_reset(void)
+void machine_reset(cdimg *cd)
 {
 	memset(g_sdram, 0, sizeof(g_sdram));
 	memset(g_sram, 0, sizeof(g_sram));
-	memset(s_spu_regs, 0, sizeof(s_spu_regs));
-	memset(s_cd_regs, 0, sizeof(s_cd_regs));
 	s_gpio_out = 0;
 
 	score7_reset();
@@ -108,6 +101,8 @@ void machine_reset(void)
 	i2c_init();
 	ppu_init();
 	screen_init();
+	cdservo_init(cd);
+	spu_init();
 
 	/* the driver's machine_reset: disable JTAG */
 	g_cpu.cr[29] = 0x20000000;

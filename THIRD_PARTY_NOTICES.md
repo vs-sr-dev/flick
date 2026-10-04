@@ -14,6 +14,9 @@ copyright headers:
 | `src/i2c.c` | `src/devices/machine/spg290_i2c.cpp`, `src/mame/tvgames/hyperscan_ctrl.cpp` | Sandro Ronco |
 | `src/screen.c` | timing of `src/emu/screen.cpp`; TV registers of driver `spg29x.cpp` | Aaron Giles, Sandro Ronco |
 | `src/machine.c` | memory map of driver `src/mame/tvgames/spg29x.cpp` | Sandro Ronco |
+| `src/cdservo.c` | `src/devices/machine/spg290_cdservo.cpp` | Sandro Ronco |
+| `src/cdimg.c` | sector layout of `src/lib/util/cdrom.cpp` (reimplemented for single-file cue/iso) | Aaron Giles, R. Belmont |
+| `src/spu.c` | `src/devices/machine/spg290_spu.cpp` of the HS-LBA MAME fork; IMA ADPCM from `src/devices/sound/imaadpcm.cpp` | Sandro Ronco, ROG; Andrew Gardner, Aaron Giles |
 
 The scheduler (`src/sched.c`) reimplements the timing rules of MAME's
 `device_scheduler` (Aaron Giles) so that events land on the same instruction; it contains

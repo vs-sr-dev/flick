@@ -1,8 +1,8 @@
 diff --git a/src/devices/cpu/score/score.cpp b/src/devices/cpu/score/score.cpp
-index 5d34d0ea..dd03584e 100644
+index 5d34d0ea..0b8f16d0 100644
 --- a/src/devices/cpu/score/score.cpp
 +++ b/src/devices/cpu/score/score.cpp
-@@ -70,12 +70,232 @@ score7_cpu_device::score7_cpu_device(const machine_config &mconfig, const char *
+@@ -70,12 +70,250 @@ score7_cpu_device::score7_cpu_device(const machine_config &mconfig, const char *
  	memset(m_ce, 0x00, sizeof(m_ce));
  }
  
@@ -122,8 +122,10 @@ index 5d34d0ea..dd03584e 100644
 +hs_prof s_prof;
 +
 +//-------------------------------------------------
-+//  HS_TRACE=<file>[:N]  instruction trace for the first N instructions (default 50M),
-+//  then the file is closed and MAME exits. Format (HyperScanEmu --trace writes the same):
++//  HS_TRACE=<file>[:N[:K[:FROM]]]  instruction trace for the first N instructions (default
++//  50M), then the file is closed and MAME exits. With K > 0 the trace is sparse: per-
++//  instruction lines only from instruction FROM on (default: never), a checkpoint every K
++//  instructions, MMIO and interrupt lines always. Format (HyperScanEmu --trace writes the same):
 +//    S <all regs>                     state before the first instruction
 +//    <pc> <op> [reg=val ...]          one per instruction; op is 4 hex digits for a 16-bit
 +//                                     instruction, else the fetched word; regs that changed
@@ -132,13 +134,14 @@ index 5d34d0ea..dd03584e 100644
 +//    I <line> c=<cycles> / X <cause>  interrupt / other exception taken; printed before the
 +//                                     line of the instruction it happened in (the handler's
 +//                                     first instruction for I, which also shows the cr changes)
++//    C n=<insns> pc=<next pc> h=<hash>  sparse checkpoint, FNV-1a of all registers
 +//    E n=<insns> c=<cycles> <regs>    state after the last instruction
 +//-------------------------------------------------
 +
 +struct hs_trace
 +{
 +	FILE *f = nullptr;
-+	uint64_t n = 0, limit = 50000000;
++	uint64_t n = 0, limit = 50000000, ckpt = 0, from = 0;
 +	uint32_t snap[0x20 + 0x20 + 3 + 2];
 +	std::string acc;                        // MMIO accesses of the current instruction
 +
@@ -147,10 +150,14 @@ index 5d34d0ea..dd03584e 100644
 +		const char *p = getenv("HS_TRACE");
 +		if (!p) return;
 +		std::string path(p);
-+		size_t c = path.rfind(':');
-+		if (c != std::string::npos && c > 1)   // keep "D:/..." intact
++		size_t c = path.find(':', 2);           // keep "D:/..." intact
++		if (c != std::string::npos)
 +		{
-+			limit = strtoull(path.c_str() + c + 1, nullptr, 0);
++			char *e;
++			limit = strtoull(path.c_str() + c + 1, &e, 0);
++			if (*e == ':') ckpt = strtoull(e + 1, &e, 0);
++			if (ckpt) from = ~0ULL;
++			if (*e == ':') from = strtoull(e + 1, &e, 0);
 +			path.resize(c);
 +		}
 +		f = fopen(path.c_str(), "w");
@@ -187,28 +194,39 @@ index 5d34d0ea..dd03584e 100644
 +
 +	void begin(uint32_t pc, const uint32_t *gpr, const uint32_t *cr, const uint32_t *sr, const uint32_t *ce)
 +	{
-+		gather(snap, gpr, cr, sr, ce);
++		if (n == 0 || n >= from) gather(snap, gpr, cr, sr, ce);
 +		if (n == 0) { fprintf(f, "S pc=%08x", pc); regs(f, snap); fprintf(f, "\n"); }
 +	}
 +
 +	// returns true when the limit is reached and the trace has been closed
-+	bool end(uint32_t pc, uint32_t op, bool op16, uint64_t cycles, const uint32_t *gpr, const uint32_t *cr, const uint32_t *sr, const uint32_t *ce)
++	bool end(uint32_t pc, uint32_t op, bool op16, uint64_t cycles, uint32_t npc, const uint32_t *gpr, const uint32_t *cr, const uint32_t *sr, const uint32_t *ce)
 +	{
 +		static const char *const ce_name[2] = { "ceh", "cel" };
 +		uint32_t now[sizeof(snap) / 4];
 +		gather(now, gpr, cr, sr, ce);
-+		if (op16) fprintf(f, "%08x %04x", pc, op & 0xffff); else fprintf(f, "%08x %08x", pc, op);
-+		for (int i = 0; i < int(sizeof(snap) / 4); i++)
-+			if (now[i] != snap[i])
-+			{
-+				if (i < 0x20) fprintf(f, " r%d=%08x", i, now[i]);
-+				else if (i < 0x40) fprintf(f, " cr%d=%08x", i - 0x20, now[i]);
-+				else if (i < 0x43) fprintf(f, " sr%d=%08x", i - 0x40, now[i]);
-+				else fprintf(f, " %s=%08x", ce_name[i - 0x43], now[i]);
-+			}
-+		fprintf(f, "\n");
++		if (n >= from)
++		{
++			if (op16) fprintf(f, "%08x %04x", pc, op & 0xffff); else fprintf(f, "%08x %08x", pc, op);
++			for (int i = 0; i < int(sizeof(snap) / 4); i++)
++				if (now[i] != snap[i])
++				{
++					if (i < 0x20) fprintf(f, " r%d=%08x", i, now[i]);
++					else if (i < 0x40) fprintf(f, " cr%d=%08x", i - 0x20, now[i]);
++					else if (i < 0x43) fprintf(f, " sr%d=%08x", i - 0x40, now[i]);
++					else fprintf(f, " %s=%08x", ce_name[i - 0x43], now[i]);
++				}
++			fprintf(f, "\n");
++		}
 +		if (!acc.empty()) { fputs(acc.c_str(), f); acc.clear(); }
-+		if (++n < limit) return false;
++		++n;
++		if (ckpt && n % ckpt == 0)
++		{
++			uint32_t h = 2166136261u;
++			for (uint32_t w : now)
++				for (int k = 0; k < 4; k++) { h ^= (w >> (k * 8)) & 0xff; h *= 16777619u; }
++			fprintf(f, "C n=%llu pc=%08x h=%08x\n", (unsigned long long)n, npc, h);
++		}
++		if (n < limit) return false;
 +		fprintf(f, "E n=%llu c=%llu pc=%08x", (unsigned long long)n, (unsigned long long)cycles, pc);
 +		regs(f, now);
 +		fprintf(f, "\n");
@@ -235,7 +253,7 @@ index 5d34d0ea..dd03584e 100644
  	// find address spaces
  	space(AS_PROGRAM).cache(m_cache);
  	space(AS_PROGRAM).specific(m_program);
-@@ -178,13 +398,17 @@ void score7_cpu_device::execute_run()
+@@ -178,13 +416,17 @@ void score7_cpu_device::execute_run()
  	{
  		m_ppc = m_pc;
  		debugger_instruction_hook(m_pc);
@@ -254,7 +272,7 @@ index 5d34d0ea..dd03584e 100644
  		{
  			case 0: // 16-bit + 16-bit instruction
  				m_op = ((m_pc & 0x02) ? (op >> 16) : op) & 0x7fff;
-@@ -207,9 +431,15 @@ void score7_cpu_device::execute_run()
+@@ -207,9 +449,15 @@ void score7_cpu_device::execute_run()
  				break;
  		}
  
@@ -262,7 +280,7 @@ index 5d34d0ea..dd03584e 100644
 +		if (s_prof.f) s_prof.insn(m_ppc, m_gpr[3]);
 +		m_icount -= s_prof.cpi;  // FIXME: if available use correct cycles per instructions
 +
-+		if (s_trace.f && s_trace.end(ipc, form == 0 ? ((ipc & 2) ? op >> 16 : op) : op, form == 0, total_cycles(), m_gpr, m_cr, m_sr, m_ce))
++		if (s_trace.f && s_trace.end(ipc, form == 0 ? ((ipc & 2) ? op >> 16 : op) : op, form == 0, total_cycles(), m_pc, m_gpr, m_cr, m_sr, m_ce))
 +			machine().schedule_exit();
  	}
  	while (m_icount > 0);
@@ -271,7 +289,7 @@ index 5d34d0ea..dd03584e 100644
  }
  
  
-@@ -221,6 +451,7 @@ void score7_cpu_device::execute_set_input(int inputnum, int state)
+@@ -221,6 +469,7 @@ void score7_cpu_device::execute_set_input(int inputnum, int state)
  {
  	if (state)
  	{
@@ -279,7 +297,7 @@ index 5d34d0ea..dd03584e 100644
  		if (inputnum > 0 && inputnum < 64)
  			m_pending_interrupt |= 1ULL << inputnum;
  	}
-@@ -278,31 +509,40 @@ uint32_t score7_cpu_device::fetch()
+@@ -278,31 +527,40 @@ uint32_t score7_cpu_device::fetch()
  
  uint8_t score7_cpu_device::read_byte(offs_t offset)
  {
@@ -323,7 +341,7 @@ index 5d34d0ea..dd03584e 100644
  	m_program.write_dword(offset & ~3, data);
  }
  
-@@ -315,6 +555,7 @@ void score7_cpu_device::check_irq()
+@@ -315,6 +573,7 @@ void score7_cpu_device::check_irq()
  			if (m_pending_interrupt & (1ULL << i))
  			{
  				m_pending_interrupt &= ~(1ULL << i);
@@ -331,7 +349,7 @@ index 5d34d0ea..dd03584e 100644
  				standard_irq_callback(i, m_pc);
  				gen_exception(EXCEPTION_INTERRUPT, i);
  				return;
-@@ -326,6 +567,11 @@ void score7_cpu_device::check_irq()
+@@ -326,6 +585,11 @@ void score7_cpu_device::check_irq()
  void score7_cpu_device::gen_exception(int cause, uint32_t param)
  {
  	debugger_exception_hook(cause);

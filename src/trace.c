@@ -10,7 +10,7 @@ int g_trace_done;
 
 #define NREGS (32 + 32 + 3 + 2)
 
-static uint64_t s_n, s_limit = 50000000;
+static uint64_t s_n, s_limit = 50000000, s_ckpt, s_from;
 static uint32_t s_snap[NREGS];
 static char s_acc[1024];
 static size_t s_acc_len;
@@ -19,10 +19,14 @@ int trace_open(const char *spec)
 {
 	char path[1024];
 	snprintf(path, sizeof(path), "%s", spec);
-	char *c = strrchr(path, ':');
-	if (c && c > path + 1)            /* keep "D:/..." intact */
+	char *c = strchr(path + 2, ':');      /* keep "D:/..." intact */
+	if (c)
 	{
-		s_limit = strtoull(c + 1, NULL, 0);
+		char *e;
+		s_limit = strtoull(c + 1, &e, 0);
+		if (*e == ':') s_ckpt = strtoull(e + 1, &e, 0);
+		if (s_ckpt) s_from = ~0ULL;
+		if (*e == ':') s_from = strtoull(e + 1, &e, 0);
 		*c = 0;
 	}
 	g_trace = fopen(path, "w");
@@ -58,7 +62,7 @@ static void regs(const uint32_t *r)
 
 void trace_begin(void)
 {
-	gather(s_snap);
+	if (s_n == 0 || s_n >= s_from) gather(s_snap);
 	if (s_n == 0)
 	{
 		fprintf(g_trace, "S pc=%08x", g_cpu.pc);
@@ -78,18 +82,29 @@ void trace_end(uint32_t pc, uint32_t op, int op16)
 	static const char *const ce_name[2] = { "ceh", "cel" };
 	uint32_t now[NREGS];
 	gather(now);
-	if (op16) fprintf(g_trace, "%08x %04x", pc, op & 0xffff); else fprintf(g_trace, "%08x %08x", pc, op);
-	for (int i = 0; i < NREGS; i++)
-		if (now[i] != s_snap[i])
-		{
-			if (i < 32) fprintf(g_trace, " r%d=%08x", i, now[i]);
-			else if (i < 64) fprintf(g_trace, " cr%d=%08x", i - 32, now[i]);
-			else if (i < 67) fprintf(g_trace, " sr%d=%08x", i - 64, now[i]);
-			else fprintf(g_trace, " %s=%08x", ce_name[i - 67], now[i]);
-		}
-	fprintf(g_trace, "\n");
+	if (s_n >= s_from)
+	{
+		if (op16) fprintf(g_trace, "%08x %04x", pc, op & 0xffff); else fprintf(g_trace, "%08x %08x", pc, op);
+		for (int i = 0; i < NREGS; i++)
+			if (now[i] != s_snap[i])
+			{
+				if (i < 32) fprintf(g_trace, " r%d=%08x", i, now[i]);
+				else if (i < 64) fprintf(g_trace, " cr%d=%08x", i - 32, now[i]);
+				else if (i < 67) fprintf(g_trace, " sr%d=%08x", i - 64, now[i]);
+				else fprintf(g_trace, " %s=%08x", ce_name[i - 67], now[i]);
+			}
+		fprintf(g_trace, "\n");
+	}
 	if (s_acc_len) { fwrite(s_acc, 1, s_acc_len, g_trace); s_acc_len = 0; }
-	if (++s_n < s_limit) return;
+	++s_n;
+	if (s_ckpt && s_n % s_ckpt == 0)        /* sparse checkpoint: FNV-1a of all registers */
+	{
+		uint32_t h = 2166136261u;
+		for (int i = 0; i < NREGS; i++)
+			for (int k = 0; k < 4; k++) { h ^= (now[i] >> (k * 8)) & 0xff; h *= 16777619u; }
+		fprintf(g_trace, "C n=%llu pc=%08x h=%08x\n", (unsigned long long)s_n, g_cpu.pc, h);
+	}
+	if (s_n < s_limit) return;
 	fprintf(g_trace, "E n=%llu c=%llu pc=%08x", (unsigned long long)s_n, (unsigned long long)g_cpu.cycles, pc);
 	regs(now);
 	fprintf(g_trace, "\n");
