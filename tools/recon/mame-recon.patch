@@ -1,0 +1,196 @@
+diff --git a/src/devices/cpu/score/score.cpp b/src/devices/cpu/score/score.cpp
+index 5d34d0ea..1f1e5d7a 100644
+--- a/src/devices/cpu/score/score.cpp
++++ b/src/devices/cpu/score/score.cpp
+@@ -70,12 +70,132 @@ score7_cpu_device::score7_cpu_device(const machine_config &mconfig, const char *
+ 	memset(m_ce, 0x00, sizeof(m_ce));
+ }
+ 
++//-------------------------------------------------
++//  recon instrumentation (local experiment, not for upstream)
++//  HS_CPI=<n>     cycles charged per instruction (default 6)
++//  HS_PROF=<file> per-second log + PC histogram dumped at exit
++//-------------------------------------------------
++
++namespace {
++
++struct hs_prof
++{
++	int cpi = 6;
++	FILE *f = nullptr;
++	std::vector<uint32_t> pc_hist;          // SDRAM PCs, halfword granularity
++	uint64_t other_pc[256] = {};            // non-SDRAM PCs by top byte
++	uint32_t api_game[256] = {}, api_other[256] = {}, api_sec[256] = {};
++	uint32_t irq_sec[64] = {};
++	uint64_t irq_total[64] = {};
++	uint64_t page_sec[256] = {};            // 64 KB SDRAM pages, this second
++	uint64_t insn_sec = 0, insn_total = 0, insn_low_sec = 0;
++	double next = 1.0;
++	// HS_IDLE="lo-hi,lo-hi" PC ranges counted as idle; HS_MARK="pc,pc" PCs counted per second
++	std::vector<std::pair<uint32_t, uint32_t>> idle;
++	std::vector<uint32_t> mark;
++	uint64_t idle_sec = 0;
++	uint32_t mark_sec[8] = {};
++	double cpi_at = -1; int cpi_next = 0;   // HS_CPI_AT="<seconds>:<cpi>" switches the CPI mid-run
++
++	void init()
++	{
++		if (const char *c = getenv("HS_CPI")) cpi = std::max(1, atoi(c));
++		if (const char *c = getenv("HS_CPI_AT")) { cpi_at = atof(c); if (const char *k = strchr(c, ':')) cpi_next = std::max(1, atoi(k + 1)); }
++		if (const char *s = getenv("HS_IDLE"))
++			for (const char *p = s; *p; )
++			{
++				char *e; uint32_t lo = strtoul(p, &e, 16); uint32_t hi = lo;
++				if (*e == '-') hi = strtoul(e + 1, &e, 16);
++				idle.emplace_back(lo, hi);
++				p = (*e == ',') ? e + 1 : e;
++			}
++		if (const char *s = getenv("HS_MARK"))
++			for (const char *p = s; *p && mark.size() < 8; )
++			{
++				char *e; mark.push_back(strtoul(p, &e, 16));
++				p = (*e == ',') ? e + 1 : e;
++			}
++		if (const char *p = getenv("HS_PROF"))
++		{
++			f = fopen(p, "w");
++			if (f) { pc_hist.assign(0x800000, 0); fprintf(f, "# HS_CPI=%d\n", cpi); }
++		}
++	}
++
++	void insn(uint32_t pc, uint32_t r3)
++	{
++		insn_sec++;
++		for (auto &r : idle) if (pc >= r.first && pc <= r.second) { idle_sec++; break; }
++		for (size_t i = 0; i < mark.size(); i++) if (pc == mark[i]) mark_sec[i]++;
++		if ((pc & 0x1f000000) == 0)
++		{
++			pc_hist[(pc & 0xffffff) >> 1]++;
++			page_sec[(pc >> 16) & 0xff]++;
++			if ((pc & 0xffffff) < 0x90000) insn_low_sec++;
++			if ((pc & 0xfffffc00) == 0xa0000800 || (pc & 0xfffffc00) == 0xa0000c00)
++			{
++				const uint32_t idx = ((pc & 0x7ff) - 0x000) >> 2;  // word index from 0xa0000800
++				if (idx < 256)
++				{
++					api_sec[idx]++;
++					if ((r3 & 0x1fffffff) >= 0x00090000) api_game[idx]++; else api_other[idx]++;
++				}
++			}
++		}
++		else
++			other_pc[pc >> 24]++;
++	}
++
++	void tick(double t)
++	{
++		if (cpi_at >= 0 && t >= cpi_at) { cpi = cpi_next; cpi_at = -1; fprintf(f, "# CPI -> %d at %.1f\n", cpi, t); }
++		if (t < next) return;
++		fprintf(f, "T %.0f insn %llu low %llu idle %llu mark", next, (unsigned long long)insn_sec, (unsigned long long)insn_low_sec, (unsigned long long)idle_sec);
++		for (size_t i = 0; i < mark.size(); i++) fprintf(f, " %u", mark_sec[i]);
++		fprintf(f, " irq");
++		idle_sec = 0; memset(mark_sec, 0, sizeof(mark_sec));
++		for (int i = 0; i < 64; i++) if (irq_sec[i]) fprintf(f, " %d:%u", i, irq_sec[i]);
++		fprintf(f, " api");
++		for (int i = 0; i < 256; i++) if (api_sec[i]) fprintf(f, " %03x:%u", 0x800 + i * 4, api_sec[i]);
++		fprintf(f, " pages");
++		for (int i = 0; i < 256; i++) if (page_sec[i] * 50 > insn_sec) fprintf(f, " %02x:%llu%%", i, (unsigned long long)(page_sec[i] * 100 / std::max<uint64_t>(insn_sec, 1)));
++		fprintf(f, "\n");
++		fflush(f);
++		insn_total += insn_sec;
++		insn_sec = insn_low_sec = 0;
++		memset(irq_sec, 0, sizeof(irq_sec)); memset(api_sec, 0, sizeof(api_sec)); memset(page_sec, 0, sizeof(page_sec));
++		next += 1.0;
++	}
++
++	~hs_prof()
++	{
++		if (!f) return;
++		fprintf(f, "# total insn %llu\n# api (word offset from a0000000: game-called / other-called)\n", (unsigned long long)insn_total);
++		for (int i = 0; i < 256; i++) if (api_game[i] || api_other[i]) fprintf(f, "API %08x %u %u\n", 0xa0000800 + i * 4, api_game[i], api_other[i]);
++		fprintf(f, "# irq totals\n");
++		for (int i = 0; i < 64; i++) if (irq_total[i]) fprintf(f, "IRQ %d %llu\n", i, (unsigned long long)irq_total[i]);
++		for (int i = 0; i < 256; i++) if (other_pc[i]) fprintf(f, "OTHERPC %02xxxxxxx %llu\n", i, (unsigned long long)other_pc[i]);
++		std::vector<std::pair<uint32_t, uint32_t>> top;
++		for (uint32_t i = 0; i < pc_hist.size(); i++) if (pc_hist[i]) top.emplace_back(pc_hist[i], 0xa0000000 | (i << 1));
++		std::sort(top.begin(), top.end(), std::greater<>());
++		for (size_t i = 0; i < top.size() && i < 400; i++) fprintf(f, "PC %08x %u\n", top[i].second, top[i].first);
++		fclose(f);
++	}
++};
++
++hs_prof s_prof;
++
++} // anonymous namespace
++
++
+ //-------------------------------------------------
+ //  device_start - start up the device
+ //-------------------------------------------------
+ 
+ void score7_cpu_device::device_start()
+ {
++	s_prof.init();
++
+ 	// find address spaces
+ 	space(AS_PROGRAM).cache(m_cache);
+ 	space(AS_PROGRAM).specific(m_program);
+@@ -207,9 +327,12 @@ void score7_cpu_device::execute_run()
+ 				break;
+ 		}
+ 
+-		m_icount -= 6;  // FIXME: if available use correct cycles per instructions
++		if (s_prof.f) s_prof.insn(m_ppc, m_gpr[3]);
++		m_icount -= s_prof.cpi;  // FIXME: if available use correct cycles per instructions
+ 	}
+ 	while (m_icount > 0);
++
++	if (s_prof.f) s_prof.tick(machine().time().as_double());
+ }
+ 
+ 
+@@ -315,6 +438,7 @@ void score7_cpu_device::check_irq()
+ 			if (m_pending_interrupt & (1ULL << i))
+ 			{
+ 				m_pending_interrupt &= ~(1ULL << i);
++				if (s_prof.f) { s_prof.irq_sec[i]++; s_prof.irq_total[i]++; }
+ 				standard_irq_callback(i, m_pc);
+ 				gen_exception(EXCEPTION_INTERRUPT, i);
+ 				return;
+diff --git a/src/mame/tvgames/spg29x.cpp b/src/mame/tvgames/spg29x.cpp
+index a5d5b708..3576b4d2 100644
+--- a/src/mame/tvgames/spg29x.cpp
++++ b/src/mame/tvgames/spg29x.cpp
+@@ -147,6 +147,9 @@ private:
+ 	uint32_t m_tv_start_addr[3] = { 0 };
+ 	uint16_t m_gpio_out = 0;
+ 
++	// recon experiment: HS_FIELDVBL=1 adds a PPU vblank at the field boundary in interlaced modes
++	emu_timer *m_field_timer = nullptr;
++	TIMER_CALLBACK_MEMBER(field_vblank);
+ };
+ 
+ class spg29x_nand_game_state : public spg29x_game_state
+@@ -384,6 +387,22 @@ void spg29x_game_state::machine_start()
+ 	m_spu->set_cpu_space(m_maincpu->space(AS_PROGRAM));
+ 
+ 	// (write tap removed — DAC FIFO ping-pong with IRQ handles streaming now)
++
++	if (getenv("HS_FIELDVBL"))
++	{
++		m_field_timer = timer_alloc(FUNC(spg29x_game_state::field_vblank), this);
++		m_field_timer->adjust(m_screen->time_until_pos(262));
++	}
++}
++
++TIMER_CALLBACK_MEMBER(spg29x_game_state::field_vblank)
++{
++	if (m_tve_control & 1)
++	{
++		m_ppu->screen_vblank(1);
++		m_ppu->screen_vblank(0);
++	}
++	m_field_timer->adjust(m_screen->time_until_pos(262));
+ }
+ 
+ void spg29x_game_state::machine_reset()

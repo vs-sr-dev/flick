@@ -1,0 +1,27 @@
+# Disc images, BIOS/firmware and anything extracted or dumped from them (copyrighted, never commit)
+*.iso
+*.bin
+*.cue
+*.chd
+*.zip
+*.7z
+*.EXE
+*.exe
+*.nv
+discs/
+bios/
+extracted/
+dumps/
+runs/
+
+# Build output
+build/
+build-release/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local tooling state
+.claude/
