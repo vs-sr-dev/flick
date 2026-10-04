@@ -19,8 +19,8 @@ seconds) match MAME's trace exactly, down to the cycle of every interrupt, and t
 and the 24 hardware voices). X-Men, Spider-Man, Marvel Heroes and IWL boot from their discs
 through the BIOS and load their game data. Over the first 60-90 seconds of each, every I/O
 access and interrupt matches MAME's, and a hash of all registers taken every 100 000
-instructions matches too. Not yet: the RFID card reader (the games ask for a character
-card), saving and loading state, a disassembler for traces.
+instructions matches too. The RFID card reader works: X-Men accepts a Wolverine card and
+reaches gameplay. Not yet: save states, a disassembler for traces.
 
 Later milestones: a timing model fitted to captures from real hardware, since MAME's flat
 6 cycles per instruction makes the heavy games run at half speed (M4); a boot without the
@@ -52,6 +52,17 @@ independent project, not affiliated with Mattel or Sunplus.
 
 Keys: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
 A/S = shoulders, Q/W = triggers, Esc = quit.
+
+### Character cards
+
+Press **F1** for the card panel. It lists every card of the game in the drive (all 445
+known cards of the five games: names, numbers and kinds such as Character, Attack Mod or
+Finishing Move); type to search, Tab to switch game, Enter to place the card on the reader.
+**F2** takes the card off. The game keeps running with the card on the reader, so you can
+scan it whenever the game asks. No card files are needed: every card is rebuilt from its
+game and number, as MAME's list does. When a game writes to a card (progress, unlocks),
+the card is saved to `cards/<id>.bin` (`--cards-dir` to move it) and that save is used the
+next time you place the same card.
 
 ## Build (Windows, MSYS2 mingw64)
 

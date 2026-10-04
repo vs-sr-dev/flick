@@ -13,6 +13,7 @@ bios/
 extracted/
 dumps/
 runs/
+cards/
 
 # Build output
 build/

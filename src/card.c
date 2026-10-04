@@ -3,17 +3,37 @@
 /* HyperScan RFID card - port of MAME's hyperscan_card.cpp (with the HS-LBA fork's 16-bit
  * response index). The BIOS bit-bangs the reader through GPIO bit 1; pulse widths are
  * classified in 13.56 MHz carrier clocks: < 500 = "0", 500-999 = "1", 1000-4999 = strobe
- * (advances the response). As in MAME, card writes stay in memory (MAME saves them to an
- * .nv file instead of the image). */
+ * (advances the response). Card writes (game saves) go to the card's save file, if any. */
 #include <limits.h>
 #include <string.h>
 #include "card.h"
 #include "sched.h"
 
-#define CARD_SIZE 120
-
 static int s_loaded;
 static uint8_t m_memory[CARD_SIZE];
+static char s_save_path[1024];          /* where card writes go ("" = memory only) */
+
+static void save_card(void)
+{
+	if (!s_save_path[0]) return;
+	FILE *f = fopen(s_save_path, "wb");
+	if (!f) { hs_log("card: cannot write %s\n", s_save_path); return; }
+	fwrite(m_memory, 1, CARD_SIZE, f);
+	fclose(f);
+}
+
+void card_insert(const uint8_t *image, const char *save_path)
+{
+	memcpy(m_memory, image, CARD_SIZE);
+	snprintf(s_save_path, sizeof(s_save_path), "%s", save_path ? save_path : "");
+	s_loaded = 1;
+}
+
+void card_remove(void)
+{
+	s_loaded = 0;
+	s_save_path[0] = 0;
+}
 static int m_state, m_bit_pos;
 static uint8_t m_data;
 static uint8_t m_cmd_buf[16];
@@ -124,8 +144,11 @@ static void check_command(void)
 	else if (m_cmd_len == 9 && (cmd[0] == 0x53 || cmd[0] == 0x1a))   // WRITE-E, WRITE-NE
 	{
 		if (cmd[1] >= CARD_SIZE) cmd[1] %= CARD_SIZE;
+		const uint8_t old = m_memory[cmd[1]];
 		if (cmd[0] == 0x53) m_memory[cmd[1]] = cmd[2];
 		else m_memory[cmd[1]] |= cmd[2];
+		if (m_memory[cmd[1]] != old)
+			save_card();
 		buf[n++] = cmd[1];
 		buf[n++] = cmd[2];
 		m_cmd_len = 0;

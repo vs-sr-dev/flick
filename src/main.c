@@ -12,6 +12,8 @@
 #include "input.h"
 #include "spu.h"
 #include "card.h"
+#include "cards.h"
+#include "ui.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -50,6 +52,8 @@ static void usage(void)
 		"  --bios FILE        HyperScan flash image (1 MB, required)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
+		"  --cards-dir DIR    where cards placed from the F1 panel keep their saves\n"
+		"                     (default: cards)\n"
 		"  --headless         no window, no audio\n"
 		"  --seconds S        stop after S emulated seconds\n"
 		"  --frames N         stop after N video frames\n"
@@ -120,6 +124,12 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 		fprintf(stderr, "no audio: %s\n", SDL_GetError());
 	static int16_t abuf[8192 * 2];
 
+	SDL_Texture *otex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 640, 480);
+	SDL_SetTextureBlendMode(otex, SDL_BLENDMODE_BLEND);
+	static uint32_t overlay[480 * 640];
+	SDL_StopTextInput();
+	ui_toast("F1: cards");
+
 	const uint64_t slice = CPU_CLOCK / 60;
 	uint64_t t0 = SDL_GetPerformanceCounter(), c0 = g_cpu.cycles;
 	const double freq = (double)SDL_GetPerformanceFrequency();
@@ -128,18 +138,59 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 		SDL_Event ev;
 		while (SDL_PollEvent(&ev))
 		{
-			if (ev.type == SDL_QUIT || (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE))
+			if (ev.type == SDL_QUIT)
 				g_quit = 1;
-			if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) && !ev.key.repeat)
+			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F1)
+			{
+				ui_panel_toggle();
+				if (ui_panel_open())
+				{
+					for (int b = 0; b < BTN_COUNT; b++) input_set(0, b, 0);   /* no stuck buttons */
+					SDL_StartTextInput();
+				}
+				else
+					SDL_StopTextInput();
+			}
+			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F2)
+				ui_key(UI_REMOVE);
+			else if (ui_panel_open())
+			{
+				if (ev.type == SDL_TEXTINPUT)
+					ui_text(ev.text.text);
+				else if (ev.type == SDL_KEYDOWN)
+				{
+					static const struct { SDL_Keycode k; int ui; } map[] = {
+						{ SDLK_UP, UI_UP }, { SDLK_DOWN, UI_DOWN }, { SDLK_PAGEUP, UI_PGUP },
+						{ SDLK_PAGEDOWN, UI_PGDN }, { SDLK_HOME, UI_HOME }, { SDLK_END, UI_END },
+						{ SDLK_RETURN, UI_ENTER }, { SDLK_KP_ENTER, UI_ENTER },
+						{ SDLK_BACKSPACE, UI_BACKSPACE }, { SDLK_ESCAPE, UI_CLOSE }, { SDLK_TAB, UI_TAB },
+					};
+					for (int k = 0; k < (int)(sizeof(map) / sizeof(map[0])); k++)
+						if (ev.key.keysym.sym == map[k].k) ui_key(map[k].ui);
+					if (!ui_panel_open()) SDL_StopTextInput();
+				}
+			}
+			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
+				g_quit = 1;
+			else if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) && !ev.key.repeat)
 				for (int k = 0; k < (int)(sizeof(s_keymap) / sizeof(s_keymap[0])); k++)
 					if (ev.key.keysym.scancode == s_keymap[k].sc)
 						input_set(0, s_keymap[k].button, ev.type == SDL_KEYDOWN);
 		}
 		input_script_update((double)g_cpu.cycles / CPU_CLOCK);
 
-		uint64_t target = g_cpu.cycles + slice;
-		if (end_cycle && target > end_cycle) target = end_cycle;
-		machine_run_until(target);
+		if (ui_panel_open())
+		{
+			/* paused: keep the pacing baseline with the wall clock */
+			t0 = SDL_GetPerformanceCounter();
+			c0 = g_cpu.cycles;
+		}
+		else
+		{
+			uint64_t target = g_cpu.cycles + slice;
+			if (end_cycle && target > end_cycle) target = end_cycle;
+			machine_run_until(target);
+		}
 
 		/* audio: queue what the SPU mixed, keeping at most ~150 ms of latency */
 		for (uint32_t n; (n = spu_take(abuf, 8192)) > 0; )
@@ -151,6 +202,11 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 		SDL_Rect src = { 0, 0, w, h };
 		SDL_RenderClear(ren);
 		SDL_RenderCopy(ren, tex, &src, NULL);
+		if (ui_render(overlay, (double)SDL_GetTicks() / 1000.0))
+		{
+			SDL_UpdateTexture(otex, NULL, overlay, 640 * 4);
+			SDL_RenderCopy(ren, otex, NULL, NULL);
+		}
 		SDL_RenderPresent(ren);
 
 		/* real-time pacing on emulated time */
@@ -162,6 +218,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 		if (frames && g_frame_count >= frames) break;
 	}
 	if (audio) SDL_CloseAudioDevice(audio);
+	SDL_DestroyTexture(otex);
 	SDL_DestroyTexture(tex);
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
@@ -172,7 +229,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 
 int main(int argc, char **argv)
 {
-	const char *bios = NULL, *shot = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL;
+	const char *bios = NULL, *shot = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
 	int headless = 0, cpi = 6;
 	double seconds = 0;
 	uint64_t frames = 0;
@@ -184,6 +241,7 @@ int main(int argc, char **argv)
 		if (!strcmp(a, "--bios")) bios = NEXT();
 		else if (!strcmp(a, "--cd")) cdpath = NEXT();
 		else if (!strcmp(a, "--card")) cardpath = NEXT();
+		else if (!strcmp(a, "--cards-dir")) cardsdir = NEXT();
 		else if (!strcmp(a, "--headless")) headless = 1;
 		else if (!strcmp(a, "--seconds")) seconds = atof(NEXT());
 		else if (!strcmp(a, "--frames")) frames = strtoull(NEXT(), NULL, 0);
@@ -209,6 +267,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	machine_reset(cd);
+	if (cardsdir) cards_set_dir(cardsdir);
+	ui_init(cards_detect_game(cd));
 	if (cardpath && !card_load(cardpath))
 	{
 		fprintf(stderr, "cannot read card image %s (120 bytes expected)\n", cardpath);
