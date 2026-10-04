@@ -3,20 +3,27 @@
 Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04, completa). Si parte con **M1: il BIOS
 arriva al logo**.
 
-## 0. Pulizia (5 minuti)
+## 0. Pulizia — fatto (2026-10-04, sera)
 
-- [ ] Fork `D:\Homebrew6\mame-hslba`: è sul branch locale `recon` con modifiche non
-      committate. Decidere se committarle su `recon` (consigliato: servono come oracolo in
-      M1), poi `git checkout hs-lba-0287` quando si torna a lavorare su HS-LBA.
-- [ ] Cancellare `D:\Homebrew6\mame-hslba\hyprscan_prev.exe` (binario vecchio, 110 MB).
-- [ ] `git init` del progetto, primo commit con `.gitignore`, `RECON.md`, `TODO.md`, `tools/recon/`.
+- [x] Fork: strumentazione committata sul branch locale `recon` (`b5313f2f`, `269f5a34`);
+      copia in [tools/mame/recon.patch](tools/mame/recon.patch) (`git diff hs-lba-0287 recon`).
+      Per HS-LBA: `git checkout hs-lba-0287` e ricompilare.
+- [x] `hyprscan_prev.exe` cancellato.
+- [x] `git init` (branch `main`), `.gitattributes` con LF come Undertow.
 
-## 1. Oracolo: traccia dal fork MAME
+## 1. Oracolo: traccia dal fork MAME — fatto
 
-- [ ] `HS_TRACE=file[:N]` in `score.cpp`: una riga per istruzione (PC, opcode, registri
-      cambiati) e una per ogni accesso MMIO (indirizzo, valore, r/w), per le prime N istruzioni.
-      Formato testuale semplice, identico a quello che scriverà il nostro `--trace`.
-- [ ] Registrare la traccia di riferimento del boot BIOS (50 M istruzioni, CPI 6, senza CD).
+- [x] `HS_TRACE=file[:N]` in `score.cpp` (formato nel commento sopra `struct hs_trace`):
+      `S` stato iniziale; `<pc> <op> reg=val…` per istruzione (op a 4 cifre se 16 bit);
+      ` R4/W1 addr val` per gli accessi MMIO dell'istruzione; `L n c=` linea IRQ alzata;
+      `I n c=` / `X cause` eccezione presa, stampata prima della riga dell'istruzione in cui
+      avviene; `E` stato finale. MAME esce dopo N istruzioni. Indirizzi non mascherati.
+- [x] Riferimento con [tools/mame/record-ref.sh](tools/mame/record-ref.sh) in `dumps/ref/`
+      (fuori da git): **72 M istruzioni = 4,000 s esatti a CPI 6** (non 50 M: il logo compare
+      tra 2 e 3 s, a 3-5 s è fermo, a 6 s dissolve), 1,68 GB, deterministico (due run
+      identiche al byte); `bios-logo-4s.png`. In 72 M: 33 mila accessi MMIO, IRQ 39/53/56.
+- Note per il port: al reset MAME mette `cr29 = 0x20000000` (JTAG off, nel driver) e
+  `cr3 = EXCPVEC = 0x9F000000`; tutti gli altri registri a zero.
 
 ## 2. Scheletro del progetto
 
@@ -35,8 +42,8 @@ arriva al logo**.
 - [ ] `timer.c` (6 timer, `P_TIMER_CLK_SEL`, IRQ 56), `uart.c` (TX su log), stub CKG/MIU/SFTCFG
       (`0x0807006C` = SDRAM in self-refresh, come MAME).
 - [ ] PPU e TV minimi per il logo (layer bitmap, palette, fade) + vblank IRQ 53.
-- [ ] Criteri di uscita: trace-diff identico sui primi 50 M istruzioni; screenshot del logo
-      identico a quello di MAME allo stesso istante.
+- [ ] Criteri di uscita: trace-diff identico sulle prime 72 M istruzioni (`cmp` con
+      `dumps/ref/bios-boot-72M.trace`); screenshot a 4,000 s identico a `bios-logo-4s.png`.
 
 ## Più avanti (da RECON.md)
 

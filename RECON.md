@@ -1,7 +1,7 @@
 # HyperScanEmu: ricognizione (RECON)
 
 Sessione del 2026-10-04. Base: fork MAME `vs-sr-dev/mame` @ `hs-lba-0287` più una patch
-di strumentazione locale (branch `recon`, salvata in `tools/recon/mame-recon.patch`).
+di strumentazione locale (branch `recon`, salvata in `tools/mame/recon.patch`).
 Titoli usati: **IWL** (USE2, bin/cue), **X-Men** (estratto, rimpacchettato in ISO),
 **Marvel Heroes** (USE2, Internet Archive). BIOS: `hyperscan.bin` (flash 1 MB).
 
@@ -321,9 +321,16 @@ A/B con la registrazione a 30 e 60 fps. Su console vera, dal logo HyperScan ai p
 Marvel passa **più di un minuto**; in MAME (CPI 6, seek gratuiti) il titolo Marvel
 Heroes appare a ~60 s.
 
+## Aggiunta: Spider-Man (2026-10-04, sera)
+
+Quarto titolo, `Spider-Man (USA)` (bin/cue MODE1, 44 MB, volume `SM_V1_0_USE1`, gennaio
+2007). `HYPER.EXE` da 790 KB con il gioco intero. Analisi statica: **22 servizi BIOS, tutti
+già fra i 29** (nessuna voce nuova). Come Marvel Heroes non chiama in modo statico
+open/read/close (`89c/8a8/8c0`): legge i file per un'altra via, da capire in M2 dalle tracce.
+
 ## Riproduzione
 
-`tools/recon/`: `mame-recon.patch` (va applicata al fork, branch `recon`), `recon.lua`,
+`tools/mame/recon.patch` (patch del fork, branch `recon`, con anche `HS_TRACE`); `tools/recon/`: `recon.lua`,
 `run.sh` (percorsi dello scratchpad di questa sessione, da adattare), `h1.py` (fps e
 tempo libero per secondo), `h3.py` (registri non mappati), `stubs2.py` (chiamate
 statiche ai servizi BIOS), `svc.py` (classificazione dei servizi dal dump RAM),
