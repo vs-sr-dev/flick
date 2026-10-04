@@ -11,7 +11,7 @@ option(HS_SDL "Build the SDL2 frontend (window, input)" ON)
 
 add_executable(hyperscanemu
   src/main.c src/machine.c src/bus.c src/sched.c src/score7.c src/trace.c
-  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c)
+  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c)
 target_compile_options(hyperscanemu PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-type-limits)
 
 if(HS_SDL)

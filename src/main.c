@@ -11,6 +11,7 @@
 #include "cdimg.h"
 #include "input.h"
 #include "spu.h"
+#include "card.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -48,6 +49,7 @@ static void usage(void)
 		"usage: hyperscanemu --bios <hyperscan.bin> [options]\n"
 		"  --bios FILE        HyperScan flash image (1 MB, required)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
+		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
 		"  --headless         no window, no audio\n"
 		"  --seconds S        stop after S emulated seconds\n"
 		"  --frames N         stop after N video frames\n"
@@ -170,7 +172,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 
 int main(int argc, char **argv)
 {
-	const char *bios = NULL, *shot = NULL, *trace = NULL, *cdpath = NULL;
+	const char *bios = NULL, *shot = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL;
 	int headless = 0, cpi = 6;
 	double seconds = 0;
 	uint64_t frames = 0;
@@ -181,6 +183,7 @@ int main(int argc, char **argv)
 #define NEXT() (i + 1 < argc ? argv[++i] : (usage(), (char *)NULL))
 		if (!strcmp(a, "--bios")) bios = NEXT();
 		else if (!strcmp(a, "--cd")) cdpath = NEXT();
+		else if (!strcmp(a, "--card")) cardpath = NEXT();
 		else if (!strcmp(a, "--headless")) headless = 1;
 		else if (!strcmp(a, "--seconds")) seconds = atof(NEXT());
 		else if (!strcmp(a, "--frames")) frames = strtoull(NEXT(), NULL, 0);
@@ -206,6 +209,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	machine_reset(cd);
+	if (cardpath && !card_load(cardpath))
+	{
+		fprintf(stderr, "cannot read card image %s (120 bytes expected)\n", cardpath);
+		return 1;
+	}
 	g_cpu.cpi = cpi;
 	if (trace && !trace_open(trace))
 	{

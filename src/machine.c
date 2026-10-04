@@ -12,6 +12,7 @@
 #include "trace.h"
 #include "cdservo.h"
 #include "spu.h"
+#include "card.h"
 
 int g_log_uart;
 volatile int g_quit;
@@ -48,8 +49,8 @@ uint32_t io_read32(uint32_t a, uint32_t mask)
 		return 0;
 	case 0x08200000:
 		if (off == 0x24) return s_gpio_out;
-		if (off == 0x68) return 0;           // RFID card data (no card yet)
-		if (off == 0x70) return 0;           // card detect (homebrew extension in the fork)
+		if (off == 0x68) return card_read();             // RFID reader data
+		if (off == 0x70) return card_loaded() ? 1 : 0;   // card detect (homebrew extension in the fork)
 		return 0;
 	case 0x08210000:
 		if (off == 0xe4) return timers_clk_sel_r();
@@ -81,7 +82,12 @@ void io_write32(uint32_t a, uint32_t data, uint32_t mask)
 		if (off < 0x6000) timer_write(off >> 12, off & 0xfff, data, mask);
 		return;
 	case 0x08200000:
-		if (off == 0x24) COMBINE(s_gpio_out, data, mask);   // card GPIO, LEDs
+		if (off == 0x24)                                   // card GPIO, LEDs
+		{
+			COMBINE(s_gpio_out, data, mask);
+			if (mask & 0xff)
+				card_write((s_gpio_out >> 1) & 1);
+		}
 		return;
 	case 0x08210000:
 		if (off >= 0x6c && off <= 0x80) timer_control_w((off - 0x6c) >> 2, data);
@@ -103,6 +109,7 @@ void machine_reset(cdimg *cd)
 	screen_init();
 	cdservo_init(cd);
 	spu_init();
+	card_reset();
 
 	/* the driver's machine_reset: disable JTAG */
 	g_cpu.cr[29] = 0x20000000;
