@@ -36,8 +36,8 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [x] `--wav FILE` registra l'audio (anche headless).
 - Verifiche: regressione identica a MAME (il preset `mame` non cambia); X-Men in
   combattimento resta a 30,0 fps col nuovo I2C.
-- [ ] **Da ascoltare (utente):** il jingle nella finestra (o nel WAV inviato) a confronto
-      con un video del boot reale: durata, loop, pausa iniziale di ~0,7 s.
+- [x] **Confermato dall'utente:** è lo "zzzzzmmm" dell'animazione del logo HyperScan che
+      pulsa, finora muta.
 - [ ] **Da controllare coi video:** col nuovo I2C X-Men legge i pad 30 volte al secondo
       nei menu invece di 15; se i menu sono legati al polling, potrebbero animarsi al
       doppio. In combattimento nessun cambiamento.
