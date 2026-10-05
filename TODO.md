@@ -96,9 +96,8 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [x] **ADPCM: i nibble vanno letti dal più basso** (come MAME SPG2xx), non dal più alto
       come nel fork HS-LBA. Verificato su campioni veri: dal basso gli effetti di Ben 10 e
       le voci di IWL tornano a 0 e non saturano mai; dall'alto derivano a fondo scala (IWL:
-      fino a 1456 campioni saturi in una voce). **Attenzione HS-LBA:** il suo encoder
-      ADPCM, se usa i canali hardware, scrive i nibble dall'alto: su console vera
-      suonerebbe come qui prima della correzione.
+      fino a 1456 campioni saturi in una voce). HS-LBA non è toccato (mixa in software
+      sulla FIFO); lo è solo il decoder della sua patch MAME (`0002-spg290-spu.patch`).
 - [x] VolSel (0x1034 bit 7:6) scala tutto il mix come in MAME SPG2xx, non solo la FIFO:
       musica ed effetti di Ben 10 tornano bilanciati (prima effetti a x1, musica a x1/2).
       Livelli: X-Men e Ben 10 RMS -16 dBFS nei momenti forti, picchi -6; **IWL** imposta
