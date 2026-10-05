@@ -86,6 +86,11 @@ seconds. Its buttons, with their keys:
 Esc quits. Cards that a game writes to are saved in `cards/` next to the executable
 (`--cards-dir` to change it).
 
+A card placed from the panel stays on the reader until F2 takes it off, as if the player
+left it there. With two players, take each card off (F2) once the game has read it, before
+the other player places theirs: a game that reads quickly, such as Ben 10, would otherwise
+read the first card again and give both players the same character.
+
 ### Timing
 
 MAME charges 6 cycles to every instruction, so X-Men fights at 15 fps. The default `fast`
