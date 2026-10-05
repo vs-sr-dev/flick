@@ -12,6 +12,15 @@
  * Hardware channels 0-23: 4-bit IMA ADPCM / 8- or 16-bit PCM with end codes; an ended
  * channel raises the FIQ.
  *
+ * The BIOS plays its boot jingle through the FIFO too, but sets it up the other way round:
+ * enable (0x1088 = 0x4007) first, then the base address and the sample clock, and its
+ * control flags (0x1034 = 0x10cb) lack bit 9, which the fork takes as the software-channel
+ * enable. In SPG2xx's layout (VolSel in bits 7:6, as used below) bit 9 is NoInt and
+ * SoftCh is bit 12, set by the BIOS and by the games alike. With g_spu_bios_dac the FIFO
+ * plays when bit 12 is set and starts once a clock is written while enabled; without it,
+ * as MAME, the jingle is silent. The BIOS decodes the jingle (KVAG ADPCM) into the FIFO
+ * only while it waits for the vblank, which also needs the I2C timing in i2c.c.
+ *
  * Timing as in MAME: the FIFO half-buffer is a timer (cycle-exact against the fork); the
  * hardware channels are mixed when the stream is updated, i.e. at register writes and at
  * a 50 Hz tick here (MAME: its sound manager), so their FIQ timing is approximate. */
@@ -82,7 +91,7 @@ static emu_timer *s_dma_timer, *s_tick;
 static int16_t m_wave_in_l, m_wave_in_r;
 static uint32_t m_wave_addr, m_wave_addr_hi, m_soft_phase, m_soft_ctrl, m_wave_pos, m_dac_half;
 static uint32_t m_dac_rate, m_dac_half_frames;
-static int m_dac_stereo;
+static int m_dac_stereo, m_dma_on;
 static int16_t m_ring[RING_SIZE * 2];
 static uint32_t m_ring_head, m_ring_tail, m_ring_frac;
 static uint32_t m_ctrl_flags, m_main_vol, m_ch_enable;
@@ -95,6 +104,7 @@ static int16_t s_out[OUT_SIZE * 2];
 static uint32_t s_out_head, s_out_tail;
 static uint64_t s_samples_done;          /* stream position, samples since reset */
 int g_spu_output_enabled;
+int g_spu_bios_dac;
 
 static uint16_t read_word(uint32_t a)
 {
@@ -185,7 +195,8 @@ static inline int16_t clip16(int32_t v)
 static void stream_render(uint32_t n)
 {
 	const float master = (float)(m_main_vol & 0x7f) / 127.0f;
-	const int fifo_dac_on = (m_ctrl_flags & 0x0200) && (m_soft_ctrl & 0x4000) && m_dac_rate;
+	const uint32_t softch = g_spu_bios_dac ? 0x1000 : 0x0200;
+	const int fifo_dac_on = (m_ctrl_flags & softch) && (m_soft_ctrl & 0x4000) && m_dac_rate;
 	uint32_t fifo_step = 0;
 	float fifo_vol = 0.0f;
 	if (fifo_dac_on)
@@ -368,11 +379,13 @@ static void dma_start(void)
 	/* attotime::from_ticks(frames, rate) */
 	const atto_t period = (atto_t)m_dac_half_frames * hz_to_atto(m_dac_rate);
 	timer_adjust(s_dma_timer, period, 0, period);
+	m_dma_on = 1;
 }
 
 static void dma_stop(void)
 {
 	timer_disable(s_dma_timer);
+	m_dma_on = 0;
 }
 
 static void tick(void *ctx, int param)
@@ -390,7 +403,7 @@ void spu_init(void)
 	m_wave_in_l = m_wave_in_r = 0;
 	m_wave_addr = m_wave_addr_hi = m_soft_phase = m_soft_ctrl = m_wave_pos = m_dac_half = 0;
 	m_dac_rate = m_dac_half_frames = 0;
-	m_dac_stereo = 0;
+	m_dac_stereo = m_dma_on = 0;
 	m_ring_head = m_ring_tail = m_ring_frac = 0;
 	m_ctrl_flags = m_main_vol = m_ch_enable = 0;
 	memset(m_regs, 0, sizeof(m_regs));
@@ -469,6 +482,8 @@ void spu_write(uint32_t off, uint32_t data, uint32_t mask)
 	case 0x1064:  // P_DAC_SAMPLE_CLK
 		stream_update();
 		COMBINE(m_soft_phase, data, mask);
+		if (g_spu_bios_dac && (m_soft_ctrl & 0x4000) && !m_dma_on)
+			dma_start();                                // enabled before the clock (BIOS)
 		break;
 	case 0x1080:  // P_DAC_FIFOBA_LOW
 		stream_update();

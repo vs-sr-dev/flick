@@ -60,6 +60,7 @@ static void usage(void)
 		"  --seconds S        stop after S emulated seconds\n"
 		"  --frames N         stop after N video frames\n"
 		"  --screenshot FILE  save the last frame as PNG on exit\n"
+		"  --wav FILE         record the sound output as WAV\n"
 		"  --trace FILE[:N[:K[:FROM]]]\n"
 		"                     trace of the first N instructions (default 50M), same format\n"
 		"                     as the MAME fork's HS_TRACE; K > 0: sparse, a checkpoint every\n"
@@ -83,13 +84,16 @@ static void usage(void)
  * "fast" = CPI 1, card pulses decoded by ratio (MAME's thresholds are tuned to CPI 6), idle
  * loops skipped; the PPU vblank stays per frame in interlaced modes, as in MAME. That gives
  * X-Men fights at 30 fps, the rate of captures from real consoles (2026-10-05); with a
- * vblank per field (--field-vblank) they would reach 60. */
+ * vblank per field (--field-vblank) they would reach 60. "fast" also plays the BIOS boot
+ * jingle (DAC FIFO set up in the BIOS's order, I2C clocked from the system clock). */
 static void set_timing(int fast)
 {
 	g_cpu.cpi = fast ? 1 : 6;
 	g_field_vblank = 0;
 	g_card_scaled = fast;
 	g_cpu.idle_skip = fast;
+	g_spu_bios_dac = fast;
+	g_i2c_sysclk = fast;
 }
 
 /* --cpi-at T:N: switch the CPI at emulated time T (timing experiments) */
@@ -115,8 +119,34 @@ static void timed_updates(void)
 	}
 }
 
+/* --wav FILE: the mixed output as a 16-bit stereo WAV (header rewritten on close) */
+static FILE *s_wav;
+static uint32_t s_wav_frames;
+
+static void wav_header(void)
+{
+	const uint32_t data = s_wav_frames * 4;
+	uint8_t h[44] = { 'R','I','F','F', 0,0,0,0, 'W','A','V','E', 'f','m','t',' ', 16,0,0,0, 1,0, 2,0,
+		0,0,0,0, 0,0,0,0, 4,0, 16,0, 'd','a','t','a', 0,0,0,0 };
+	const uint32_t v[4][2] = { { 4, 36 + data }, { 24, SPU_OUT_RATE }, { 28, SPU_OUT_RATE * 4 }, { 40, data } };
+	for (int i = 0; i < 4; i++)
+		for (int b = 0; b < 4; b++) h[v[i][0] + b] = (uint8_t)(v[i][1] >> (8 * b));
+	fseek(s_wav, 0, SEEK_SET);
+	fwrite(h, 1, sizeof(h), s_wav);
+	fseek(s_wav, 0, SEEK_END);
+}
+
+/* drain the mix into the WAV file, if one is open */
+static void wav_write(const int16_t *buf, uint32_t n)
+{
+	if (!s_wav) return;
+	fwrite(buf, 4, n, s_wav);          /* little-endian host */
+	s_wav_frames += n;
+}
+
 static int run_headless(uint64_t end_cycle, uint64_t frames)
 {
+	static int16_t abuf[8192 * 2];
 	clock_t h0 = clock();
 	uint64_t c0 = g_cpu.cycles, f0 = g_frame_count, m0 = g_mark_count;
 	while (!g_trace_done && !g_quit)
@@ -132,6 +162,12 @@ static int run_headless(uint64_t end_cycle, uint64_t frames)
 		uint64_t step = g_cpu.cycles + CPU_CLOCK / 1000;
 		if (end_cycle && step > end_cycle) step = end_cycle;
 		machine_run_until(step);
+		if (s_wav)
+		{
+			spu_sync();
+			for (uint32_t n; (n = spu_take(abuf, 8192)) > 0; )
+				wav_write(abuf, n);
+		}
 		timed_updates();
 		if (end_cycle && g_cpu.cycles >= end_cycle) break;
 		if (frames && g_frame_count >= frames) break;
@@ -258,7 +294,10 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 				machine_run_until(target);
 				spu_sync();
 				for (uint32_t n; (n = spu_take(abuf, 8192)) > 0; )
+				{
 					SDL_QueueAudio(audio, abuf, n * 4);
+					wav_write(abuf, n);
+				}
 				if (end_cycle && g_cpu.cycles >= end_cycle) break;
 			}
 			if (SDL_GetQueuedAudioSize(audio) >= low)
@@ -306,7 +345,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 
 int main(int argc, char **argv)
 {
-	const char *bios = NULL, *shot = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
+	const char *bios = NULL, *shot = NULL, *wav = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
 	int headless = 0, cpi = 0, io_cycles = 0, fast = 1;
 	double seconds = 0;
 	uint64_t frames = 0;
@@ -333,6 +372,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--seconds")) seconds = atof(NEXT());
 		else if (!strcmp(a, "--frames")) frames = strtoull(NEXT(), NULL, 0);
 		else if (!strcmp(a, "--screenshot")) shot = NEXT();
+		else if (!strcmp(a, "--wav")) wav = NEXT();
 		else if (!strcmp(a, "--trace")) trace = NEXT();
 		else if (!strcmp(a, "--cpi")) cpi = atoi(NEXT());
 		else if (!strcmp(a, "--timing"))
@@ -388,6 +428,17 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (wav)
+	{
+		if (!(s_wav = fopen(wav, "wb")))
+		{
+			fprintf(stderr, "cannot write %s\n", wav);
+			return 1;
+		}
+		wav_header();
+		g_spu_output_enabled = 1;
+	}
+
 	const uint64_t end_cycle = seconds > 0 ? machine_seconds_to_cycles(seconds) : 0;
 	int rc;
 #ifdef HS_HAVE_SDL
@@ -408,6 +459,11 @@ int main(int argc, char **argv)
 	if (shot && !png_write(shot, &g_frame[0][0], 640, screen_width(), screen_height()))
 		fprintf(stderr, "cannot write %s\n", shot);
 	if (g_trace) fclose(g_trace);
+	if (s_wav)
+	{
+		wav_header();
+		fclose(s_wav);
+	}
 	if (g_verbose)
 	{
 		card_report(stderr);

@@ -19,6 +19,32 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
   della mossa finale eseguita; dopo il fight il gioco riscrive la carta (+10 esperienza,
   byte 0x32 = 0x0a), salvata in `cards/xmen001.bin` e riconosciuta da Card Evaluation.
 
+## Sessione del 2026-10-05 (mattina): jingle del boot
+
+- [x] **Il boot ora suona** (preset `fast`). Non era un canale diverso: è il DAC FIFO, con
+      un loop KVAG (ADPCM, 22050 Hz, 2,5 s) che il BIOS decodifica in RAM. Tre cause:
+      1. il BIOS abilita la FIFO (0x1088 = 0x4007) *prima* di scrivere indirizzo e sample
+         clock: l'avvio veniva scartato (clock 0). Ora parte alla scrittura del clock;
+      2. 0x1034 = 0x10cb non ha il bit 9 che il fork prende per SoftCh; nel layout SPG2xx
+         (VolSel in 7:6, già usato) SoftCh è il bit 12, che hanno sia il BIOS sia i giochi
+         (0x168b). Verificato: tutti e quattro i giochi scrivono solo 0x168b/0x10cb;
+      3. il BIOS decodifica il jingle solo mentre aspetta il vblank (0xA001528C chiama il
+         servizio audio 0xA000A0A8), ma ogni frame legge 10 registri dei pad via I2C con
+         divisore 0x258: col clock di MAME (27 MHz / 4 / 601) sono 33,86 ms, un frame
+         intero, e l'attesa del vblank non attende mai. Con l'I2C a 108 MHz (clock di
+         sistema: MAME dà 27 MHz a tutte le periferiche) le letture prendono 1/4 di frame.
+- [x] `--wav FILE` registra l'audio (anche headless).
+- Verifiche: regressione identica a MAME (il preset `mame` non cambia); X-Men in
+  combattimento resta a 30,0 fps col nuovo I2C.
+- [ ] **Da ascoltare (utente):** il jingle nella finestra (o nel WAV inviato) a confronto
+      con un video del boot reale: durata, loop, pausa iniziale di ~0,7 s.
+- [ ] **Da controllare coi video:** col nuovo I2C X-Men legge i pad 30 volte al secondo
+      nei menu invece di 15; se i menu sono legati al polling, potrebbero animarsi al
+      doppio. In combattimento nessun cambiamento.
+- [ ] La calibrazione dell'offset del servo ("Off Cal") fa 61 iterazioni con ritardi
+      software (~130 ms a CPI 1) perché il nostro servo non converge mai: su hardware
+      vero probabilmente ne bastano poche (M4, insieme ai seek).
+
 ## Prossima sessione
 
 ### 1. Comodità del frontend

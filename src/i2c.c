@@ -1,13 +1,21 @@
 // license:BSD-3-Clause
 // copyright-holders:Sandro Ronco
 /* SPG290 I2C master - port of MAME's spg290_i2c.cpp, with the HyperScan controllers
- * (MAME's hyperscan_ctrl.cpp HLE) on ports 0 and 1 as wired by the spg29x driver. */
+ * (MAME's hyperscan_ctrl.cpp HLE) on ports 0 and 1 as wired by the spg29x driver.
+ *
+ * MAME clocks the block from the 27 MHz crystal. The BIOS sets the divider to 600, so a
+ * read of one controller register takes 3.4 ms, and the 10 it makes per frame (two pads,
+ * 5 registers each) take 33.86 ms: all of a frame. Its frame loop then never waits for
+ * the vblank, which is where it feeds its boot jingle, and the jingle stalls after its
+ * first buffer. Clocked from the 108 MHz system clock (g_i2c_sysclk, fast preset) the
+ * reads take a quarter of the frame and the jingle plays through. */
 #include "devices.h"
 #include "sched.h"
 #include "score7.h"
 
 static uint32_t s_config, s_irq_control, s_clock_conf, s_id, s_port_addr, s_wdata, s_rdata;
 static emu_timer *s_timer;
+int g_i2c_sysclk;
 
 /* IN.0/IN.1 buttons (active high), IN.2/IN.3 analog sticks centred at 0x7f */
 uint8_t g_pad[2][4] = { { 0, 0, 0x7f, 0x7f }, { 0, 0, 0x7f, 0x7f } };
@@ -81,7 +89,8 @@ void i2c_write(uint32_t off, uint32_t data, uint32_t mask)
 	{
 		COMBINE(s_config, data, mask);
 		/* attotime::from_hz(clock() / 4 / ((m_clock_conf & 0x3ff) + 1)), integer clock */
-		const atto_t clk = hz_to_atto(XTAL_27M / 4 / ((s_clock_conf & 0x3ff) + 1));
+		const uint32_t base = g_i2c_sysclk ? CPU_CLOCK : XTAL_27M;
+		const atto_t clk = hz_to_atto(base / 4 / ((s_clock_conf & 0x3ff) + 1));
 		if (s_config & 0x0001)       // Start 8
 			timer_adjust(s_timer, clk * (2 + 9 * 4), 0, 0);
 		else if (s_config & 0x0002)  // Start 16

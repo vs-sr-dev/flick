@@ -44,6 +44,7 @@ independent project, not affiliated with Mattel or Sunplus.
 | `--headless` | no window |
 | `--seconds S`, `--frames N` | stop after S emulated seconds / N frames |
 | `--screenshot FILE` | save the last frame as PNG on exit |
+| `--wav FILE` | record the sound output as a WAV file (window or headless) |
 | `--trace FILE[:N[:K[:FROM]]]` | trace the first N instructions (default 50M), same format as the MAME fork; with K > 0 a sparse trace (I/O, interrupts, a register hash every K instructions, full lines from FROM on) |
 | `--input SPEC` | scripted presses, `T:button[:dur][@pad],...` with times in seconds |
 | `--timing fast\|mame` | timing model (default `fast`, see below); `--trace` forces `mame` |
@@ -62,7 +63,11 @@ preset charges 1 cycle per instruction and keeps MAME's PPU vblank per frame in 
 interlaced video modes: X-Men fights at 30 fps, as on captures from real consoles. It also
 decodes the card reader's pulses by their ratios rather than MAME's absolute widths, which
 only work at 6 cycles per instruction, and fast-forwards idle loops (exactly: whole
-iterations, never past the next event). `--timing mame` (or F3 in the window) gives
+iterations, never past the next event). It also plays the BIOS boot jingle, which MAME
+leaves silent: the BIOS starts the DAC FIFO before giving it a sample clock, and feeds it
+only while its frame loop waits for the vblank, which it never does when the controllers'
+I2C is clocked as in MAME (27 MHz); `fast` clocks it from the 108 MHz system clock.
+`--timing mame` (or F3 in the window) gives
 MAME's behaviour back, cycle for cycle. `--field-vblank` raises a vblank per field instead,
 which lets X-Men reach 60 fps: real captures say it does not. Fitting the rest of the
 timing (loading times, CD seeks) to the real console is milestone M4.

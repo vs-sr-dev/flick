@@ -8,6 +8,7 @@
 #define SPU_OUT_RATE 44100
 
 extern int g_spu_output_enabled;    /* keep mixed samples for the frontend */
+extern int g_spu_bios_dac;          /* DAC FIFO as the BIOS boot jingle needs (off = as MAME) */
 
 void spu_init(void);
 uint32_t spu_read(uint32_t off);
