@@ -1,73 +1,77 @@
 # TODO
 
-Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**; M2 quasi fatto (vedi sotto).
+Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e uso).
 
-## 0. Pulizia — fatto (2026-10-04, sera)
+## Stato alla fine della sessione del 2026-10-04/05
 
-- [x] Fork: strumentazione committata sul branch locale `recon` (`b5313f2f`, `269f5a34`);
-      copia in [tools/mame/recon.patch](tools/mame/recon.patch) (`git diff hs-lba-0287 recon`).
-      Per HS-LBA: `git checkout hs-lba-0287` e ricompilare.
-- [x] `hyprscan_prev.exe` cancellato.
-- [x] `git init` (branch `main`), `.gitattributes` con LF come Undertow.
+- **M1 fatto:** CPU S+core 7, bus, timer, I2C + pad, PPU, timing schermo/TV. Le prime 72 M
+  istruzioni del boot sono identiche al byte alla traccia di MAME; logo identico al pixel.
+- **M2 quasi fatto:** CD servo + immagini (cue a file singolo, ISO), SPU con audio SDL,
+  lettore RFID, pannello carte F1/F2 (445 carte dal catalogo CC0 di MAME, salvataggi in
+  `cards/<id>.bin`), input da tastiera e da script.
+- **Regressione:** `BIOS=... bash tools/regress.sh` = M1 + tracce sparse di X-Men,
+  Spider-Man, Marvel Heroes (60 s) e IWL (90 s): tutte identiche a MAME (circa 6 minuti).
+- **Timing:** preset `fast` predefinito = CPI 1, vblank per frame come MAME, decoder della
+  carta per rapporti, skip esatto dei loop d'attesa, timer analitici. X-Men combatte a
+  **30 fps, confermato dall'utente sui video reali** ("praticamente identico"); `--timing
+  mame` / F3 = MAME al ciclo. Host: circa 280% del tempo reale in combattimento.
+- **Gameplay verificato dall'utente (X-Men):** audio perfetto; carta personaggio, carta
+  della mossa finale eseguita; dopo il fight il gioco riscrive la carta (+10 esperienza,
+  byte 0x32 = 0x0a), salvata in `cards/xmen001.bin` e riconosciuta da Card Evaluation.
 
-## 1. Oracolo: traccia dal fork MAME — fatto
+## Prossima sessione
 
-- [x] `HS_TRACE=file[:N]` in `score.cpp` (formato nel commento sopra `struct hs_trace`):
-      `S` stato iniziale; `<pc> <op> reg=val…` per istruzione (op a 4 cifre se 16 bit);
-      ` R4/W1 addr val` per gli accessi MMIO dell'istruzione; `L n c=` linea IRQ alzata;
-      `I n c=` / `X cause` eccezione presa, stampata prima della riga dell'istruzione in cui
-      avviene; `E` stato finale. MAME esce dopo N istruzioni. Indirizzi non mascherati.
-- [x] Riferimento con [tools/mame/record-ref.sh](tools/mame/record-ref.sh) in `dumps/ref/`
-      (fuori da git): **72 M istruzioni = 4,000 s esatti a CPI 6** (non 50 M: il logo compare
-      tra 2 e 3 s, a 3-5 s è fermo, a 6 s dissolve), 1,68 GB, deterministico (due run
-      identiche al byte); `bios-logo-4s.png`. In 72 M: 33 mila accessi MMIO, IRQ 39/53/56.
-- Note per il port: al reset MAME mette `cr29 = 0x20000000` (JTAG off, nel driver) e
-  `cr3 = EXCPVEC = 0x9F000000`; tutti gli altri registri a zero.
+### 1. Comodità del frontend
+- [ ] **Toolbar in cima alla finestra** per le opzioni: aprire un disco, carte (= F1),
+      togliere la carta, timing fast/mame, schermo intero, scala della finestra, volume,
+      screenshot, pausa, reset; più avanti save state. Decidere fra una barra disegnata da
+      noi (stesso font e stile del pannello carte, portabile, a scomparsa quando il mouse
+      esce) e un menu Win32 nativo via `SDL_SysWMinfo` (solo Windows). Proposta: disegnata
+      da noi.
+- [ ] Cartella `cards` accanto all'eseguibile, non nella cartella corrente (oggi finisce
+      dove si lancia il programma). Spostare l'attuale `cards/xmen001.bin` (10 punti
+      esperienza dell'utente) nella nuova posizione.
+- [ ] Schermo intero (Alt+Invio), ridimensionamento con proporzioni, scala intera.
+- [ ] Gamepad (SDL GameController) e secondo giocatore (porta I2C 1).
+- [ ] Save state (CPU, RAM, device, scheduler; formato versionato).
+- [ ] Avvio senza argomenti: dialogo per scegliere BIOS e disco, ricordati in un file di
+      configurazione.
 
-## 2-3. Scheletro e M1 — fatto (2026-10-04, sera)
+### 2. Copertura dei giochi
+- [ ] **Ben 10** (`J:\Users\utente\Downloads\roms\Ben 10 (USA) (USE2).cue`, volume
+      `BT_V1_0_USE2`, quinto gioco, mai provato) e il dump vero di **X-Men USE2**
+      (`X-Men (USA) (USE2).cue`): aggiungerli a `tools/games.sh`, registrare i riferimenti
+      con `tools/mame/record-games.sh`, provarli col preset fast.
+- [ ] Gameplay di Spider-Man, Marvel Heroes, IWL e Ben 10 col preset fast: carte,
+      frame rate a confronto con i video (un gioco VGA interlacciato a 60 fps smentirebbe
+      il modello "CPI 1 + vblank per frame").
+- [ ] Parità con input fra noi e MAME: MAME inietta i tasti via Lua ai confini di frame,
+      `--input` a tempi in secondi; serve un formato comune (frame o ciclo) per estendere
+      la regressione al gameplay.
 
-- [x] CMake + Ninja, C99 (+ `unsigned __int128` per il tempo esatto), SDL2 opzionale;
-      README, LICENSE (MIT), THIRD_PARTY_NOTICES (BSD-3 per i port da MAME).
-- [x] CLI: `--bios`, `--headless`, `--seconds`, `--frames`, `--screenshot`, `--trace`,
-      `--cpi`, `--log-uart`, `-v`. Finestra SDL in tempo reale (ESC esce).
-- [x] `score7.c` (port 1:1), `sched.c` (regole del `device_scheduler`: tempo CPU =
-      cicli × aps troncato, un evento a T è visibile dalla prima istruzione con
-      ciclo ≥ floor(T/aps)), `bus.c`, `timer.c` (un evento per tick, come MAME),
-      `i2c.c` + pad, `screen.c` (timing di `screen_device`, TV, fade), `ppu.c`.
-- [x] **Criteri di uscita superati**: traccia di 72 M istruzioni identica al byte
-      (`tools/m1check.sh`), screenshot a 4,000 s identico (0 pixel diversi).
-- Velocità: 4 s emulati in 0,8 s (CPI 6), circa 5× il tempo reale.
+### 3. Distribuzione
+- [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
+      THIRD_PARTY_NOTICES, licenze; script `tools/package_release.sh`; versione nel binario.
+- [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
+- [ ] Le opzioni di default di `tools/games.sh` puntano a percorsi di questa macchina:
+      renderle relative a `discs/` prima di pubblicare.
 
-## M2 — in corso (2026-10-05, notte)
+### 4. M4: timing reale
+- [ ] Tempo di seek del CD (MAME: istantaneo; misurato 100-200 ms sull'hardware) e durata
+      dei caricamenti di X-Men a confronto con un video cronometrato.
+- [ ] Il log UART del BIOS (`--log-uart`) descrive i seek (`SEEK mode`, `NowQ=`): utile
+      per il modello.
+- [ ] Boot reale: >1 minuto dal logo HyperScan ai loghi Marvel su console vera.
 
-- [x] CD servo (port), immagini cue a file singolo e ISO identiche a `cdrom_file` di MAME.
-- [x] SPU (port del nostro device): DAC FIFO a timer, 24 voci, audio SDL.
-- [x] Lettore RFID (port), `--card`; X-Men arriva al combattimento con Wolverine.
-- [x] Tracce sparse (`file:N:K[:FROM]`) da entrambi i lati; `tools/regress.sh` =
-      M1 + X-Men/Spider-Man/Marvel Heroes 60 s + IWL 90 s, tutti identici a MAME.
-- [x] Pannello carte (F1/F2), catalogo di 445 carte da MAME (CC0), salvataggi in `cards/`.
-- [ ] Ben 10 (`J:/.../roms/Ben 10 (USA) (USE2).cue`, volume `BT_V1_0_USE2`) e il dump
-      vero di X-Men USE2 (bin/cue): aggiungerli a `tools/games.sh` e registrare i riferimenti.
-- [ ] Parità con input: i tasti iniettati in MAME via Lua cadono ai confini di frame,
-      i nostri `--input` a tempi in secondi; serve un formato comune (frame o ciclo).
-- [ ] Spider-Man: legge i file senza le voci open/read/close; capire come (tracce).
-- [ ] Catalogo dei 29 servizi BIOS con nomi e firme dalle tracce (serve a M5).
-- [x] Prestazioni: timer analitici (un evento per overflow invece che per tick, traccia
-      identica), skip esatto dei loop d'attesa. X-Men in combattimento a CPI 1: 150%.
-- [x] Preset `--timing fast` (predefinito): CPI 1, vblank per frame come MAME, decoder
-      della carta per rapporti (il BIOS tara i suoi loop al boot: le larghezze assolute
-      dipendono dal CPI, i rapporti no), skip dei loop d'attesa. F3 alterna con `mame`.
-- [x] **Dato reale (2026-10-05, confronto con i video):** X-Men combatte a **30 fps**. Due
-      modelli compatibili: A) CPI ~1 + vblank per frame (scelto, predefinito); B) vblank
-      per semiquadro + CPI 2-3,7. Discriminanti per M4: un gioco VGA interlacciato a 60 fps
-      nei video smentirebbe A; la durata dei caricamenti (CPU-bound) separa A da B, ma
-      serve anche il modello dei seek.
-- [x] Audio: il frontend usa la coda audio come orologio (60 ms), niente più scatti attesi.
+### 5. Verso M5 (boot senza BIOS)
+- [ ] Spider-Man legge i file senza le voci open/read/close della tabella BIOS: capire
+      come dalle tracce.
+- [ ] Catalogo dei 29 servizi BIOS (nomi, argomenti, risultati) dalle tracce LLE.
 
-## Più avanti (da RECON.md)
-
-- M2: CD servo + I2C/pad + PPU completa → X-Men e IWL muti; catalogo dei 29 servizi BIOS dalle tracce.
-- M3: SPU, RFID, Marvel Heroes (carta big-endian `00 04 00 01`).
-- M4: timing (CPI per classe, vblank per semiquadro, seek) tarato in A/B sulla **velocità di
-  movimento** nei video reali; vincolo: la carta deve restare leggibile.
-- M5: HLE del BIOS validato contro l'LLE; avvio rapido.
+### Note
+- `dumps/` occupa circa 14 GB (riferimenti completi a 72 M e 180 M istruzioni, tracce
+  sparse): i riferimenti servono alla regressione, il resto si può cancellare.
+- Dal tool Bash: `\n` dentro heredoc e one-liner Python arriva come a capo vero; le
+  stringhe C con `\n` vanno modificate con l'editor.
+- Fork MAME: branch locale `recon` (HS_TRACE completo e sparso, profiling); per HS-LBA
+  tornare a `hs-lba-0287`.
