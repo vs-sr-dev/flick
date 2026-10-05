@@ -105,17 +105,20 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       SPG2xx. L'utente ha confrontato all'orecchio 4 decodifiche: vincono MAME e la tabella
       PSX (il coefficiente conta poco), perde il polo doppio. Il senso esatto di `coef`
       resta da capire.
+  **Confermato dall'utente in partita** (i pugni di Ben ora suonano giusti).
 - [ ] Canali hardware: i loop (tone mode 2, LoopAddr) non sono implementati (nessun gioco
       provato li usa finora).
 - [x] VolSel (0x1034 bit 7:6) scala tutto il mix come in MAME SPG2xx, non solo la FIFO:
       musica ed effetti di Ben 10 tornano bilanciati (prima effetti a x1, musica a x1/2).
       Livelli: X-Men e Ben 10 RMS -16 dBFS nei momenti forti, picchi -6; **IWL** imposta
       VolSel 1 e le sue voci escono a picco -18 dBFS: da sentire.
-- [ ] **Riga glitchata nello split-screen** (righe 0-7 con pezzi di sfondo, modo
-      640x240): serve un dump Ctrl+F12 dall'utente in modalità due giocatori, poi
-      `--render-dump` per correggere il renderer offline. Sospetti: compressione verticale
-      (`vcomp_*`), tabelle hoffset/voffset, wrap verticale dei layer a caratteri; il
-      renderer di MAME non implementa le prime due.
+- [x] **Riga glitchata nello split-screen**: dal dump dell'utente, nessun trucco a metà
+      frame (le due metà stanno negli stessi tilemap, 3 layer); la riga 0 dei tilemap è
+      spazzatura e la disposizione (due metà da 120 righe, IRQ di riga a 120) parte dalla
+      riga 8. In HVGA (640x240) lo schermo ora mostra le righe 8-247 dei layer (le uniche
+      altre schermate HVGA, di Spider-Man, sono nere). Nessun video reale per confermare.
+- [ ] IRQ di riga del PPU (irq_control bit 2, irq_timing_v/h) non emulato, nemmeno da
+      MAME: Ben 10 lo abilita a riga 120 in due giocatori; il suo gestore passa dal BIOS.
 - [x] Strumento: Ctrl+F12 / `--debug-dump DIR` salvano RAM e stato video, `--render-dump
       DIR` ri-renderizza il frame (verificato identico al pixel).
 

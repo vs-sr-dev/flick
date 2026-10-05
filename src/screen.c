@@ -83,9 +83,23 @@ int screen_undump(FILE *f)
 	return ok;
 }
 
+/* HVGA (640x240): the picture starts 8 lines into the layers. Ben 10's split screen
+ * leaves its tilemaps' first row as non-tile data and lays out two identical 120-line
+ * halves (border, 104 lines of scene, dark band) from line 8 on, with its raster IRQ at
+ * line 120; from line 0, as MAME shows it, the junk row is on screen and player 2's dark
+ * band falls off the bottom. Spider-Man's only HVGA frames are black. */
+#define HVGA_TOP 8
+
 void screen_compose(void)
 {
-	ppu_render(g_frame, s_vis_w, s_vis_h);
+	static uint32_t tall[240 + HVGA_TOP][640];
+	if (s_vis_w == 640 && s_vis_h == 240)
+	{
+		ppu_render(tall, s_vis_w, s_vis_h + HVGA_TOP);
+		memcpy(g_frame, tall[HVGA_TOP], sizeof(g_frame[0]) * s_vis_h);
+	}
+	else
+		ppu_render(g_frame, s_vis_w, s_vis_h);
 
 	// TVE frame buffer
 	if (s_tve_buffer_ctrl < 3)
