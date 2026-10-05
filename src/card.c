@@ -5,6 +5,7 @@
  * classified in 13.56 MHz carrier clocks: < 500 = "0", 500-999 = "1", 1000-4999 = strobe
  * (advances the response). Card writes (game saves) go to the card's save file, if any. */
 #include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 #include "card.h"
 #include "sched.h"
@@ -45,12 +46,16 @@ static atto_t m_last_at;
 
 /* Scale-free pulse decoding (not in MAME). The BIOS times the pulses with delay loops it
  * calibrates at boot plus a part that scales with the CPU's speed, so their absolute width
- * depends on the timing model, while their ratios do not: start pulse : "0" : "1" : strobe
- * stay about 5.7 : 1 : 3 : 10. With the start pulse of the session as the reference, the
- * classes are those of MAME's absolute thresholds at CPI 6, and any CPI works. */
+ * depends on the timing model (and changes if the CPI changes after boot), while their
+ * ratios do not. Every pulse is preceded by a short low gap of the same kind (69 carrier
+ * clocks at CPI 6, 30 at CPI 1); relative to it a "0" is ~2.7-2.9, a "1" ~7.8-9.4, the
+ * start pulse ~15-19, a strobe ~26-33 and pauses ~700 and up. Low phases longer than
+ * SHORT_LOW are the reader being switched off between attempts (millions of clocks): the
+ * pulse after one is measured against the last short gap. At CPI 6 the classes are those
+ * of MAME's absolute thresholds. */
+#define SHORT_LOW 20000
 int g_card_scaled;
-static int s_expect_start;
-static int s_start = 1022;                  /* CPI 6 value until a session starts */
+static int s_low, s_ref;                    /* last low phase, last short one (0: none yet) */
 
 /* pulse statistics for timing experiments: count, min, max carrier clocks per class */
 static struct { uint64_t n; int lo, hi; } s_stat[3] = { { 0, 1 << 30, 0 }, { 0, 1 << 30, 0 }, { 0, 1 << 30, 0 } };
@@ -90,8 +95,7 @@ void card_reset(void)
 	m_cmd_len = m_resp_len = 0;
 	m_resp_idx = 0;
 	m_last_at = 0;
-	s_expect_start = 0;
-	s_start = 1022;
+	s_low = s_ref = 0;
 }
 
 static uint16_t calc_crc(const uint8_t *data, int len)
@@ -187,7 +191,10 @@ static void check_command(void)
 
 void card_write(int state)
 {
-	if (m_state == state || !s_loaded)
+	/* MAME ignores the reader pins while no card is loaded; the scale-free decoder follows
+	 * them anyway, so that a card placed after the reader was powered up (F1) still has
+	 * the session's start pulse as its reference */
+	if (m_state == state || (!s_loaded && !g_card_scaled))
 		return;
 	m_state = state;
 
@@ -203,12 +210,22 @@ void card_write(int state)
 	const int clk = c >= (double)INT_MAX ? INT_MAX : (int)c;
 	m_last_at = now;
 
+	/* debug: HS_CARD_LOG=<file> logs every edge: new state, carrier clocks since the last */
+	static FILE *s_log;
+	static int s_log_init;
+	if (!s_log_init)
+	{
+		s_log_init = 1;
+		const char *p = getenv("HS_CARD_LOG");
+		if (p) s_log = fopen(p, "w");
+	}
+	if (s_log) fprintf(s_log, "%d %d %d\n", state, clk, s_loaded);
+
 	if (state)
 	{
-		/* a long low phase is the reader being powered up: the next pulse is the session's
-		 * start pulse, the reference for the scale-free decoder */
-		if (g_card_scaled && clk > 100000)
-			s_expect_start = 1;
+		/* the low phase before this pulse: the reference for the scale-free decoder */
+		s_low = clk;
+		if (clk <= SHORT_LOW) s_ref = clk;
 		return;
 	}
 
@@ -216,17 +233,15 @@ void card_write(int state)
 	int cls;
 	if (!g_card_scaled)                         /* MAME's thresholds (tuned to CPI 6) */
 		cls = clk < 500 ? 0 : clk < 1000 ? 1 : clk < 5000 ? 2 : -1;
-	else if (s_expect_start)
+	else if (!s_ref)                            /* no short gap seen yet */
+		cls = -1;
+	else
 	{
-		s_start = clk;
-		s_expect_start = 0;
-		cls = 2;
+		const double r = (double)clk / s_ref;
+		cls = r < 5 ? 0 : r < 12 ? 1 : r < 100 ? 2 : -1;
 	}
-	else                                        /* relative to the start pulse S: 0 ~0.18 S, */
-	{                                           /* 1 ~0.53 S, strobe ~1.8 S, gaps ~50 S */
-		const double r = (double)clk / s_start;
-		cls = r < 0.33 ? 0 : r < 1.0 ? 1 : r < 4.9 ? 2 : -1;
-	}
+	if (!s_loaded)
+		return;
 
 	if (cls == 0 || cls == 1)
 	{

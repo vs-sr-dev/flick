@@ -53,6 +53,7 @@ static void usage(void)
 		"  --bios FILE        HyperScan flash image (1 MB, required)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
+		"  --card-at T:ID     place catalogue card ID (e.g. xmen001) on the reader at T s\n"
 		"  --cards-dir DIR    where cards placed from the F1 panel keep their saves\n"
 		"                     (default: cards)\n"
 		"  --headless         no window, no audio\n"
@@ -95,9 +96,18 @@ static void set_timing(int fast)
 static uint64_t s_cpi_at_cycle = UINT64_MAX;
 static int s_cpi_at;
 
+/* --card-at T:ID: place a catalogue card on the reader at T seconds, as F1 does */
+static uint64_t s_card_at_cycle = UINT64_MAX;
+static const card_info *s_card_at;
+
 static void timed_updates(void)
 {
 	input_script_update((double)g_cpu.cycles / CPU_CLOCK);
+	if (g_cpu.cycles >= s_card_at_cycle)
+	{
+		cards_insert(s_card_at);
+		s_card_at_cycle = UINT64_MAX;
+	}
 	if (g_cpu.cycles >= s_cpi_at_cycle)
 	{
 		g_cpu.cpi = s_cpi_at;
@@ -309,6 +319,16 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--cd")) cdpath = NEXT();
 		else if (!strcmp(a, "--card")) cardpath = NEXT();
 		else if (!strcmp(a, "--cards-dir")) cardsdir = NEXT();
+		else if (!strcmp(a, "--card-at"))
+		{
+			char id[32];
+			double t;
+			if (sscanf(NEXT(), "%lf:%31s", &t, id) != 2) usage();
+			for (int k = 0; k < g_card_count; k++)
+				if (!strcmp(g_card_list[k].id, id)) s_card_at = &g_card_list[k];
+			if (!s_card_at) { fprintf(stderr, "unknown card %s (e.g. xmen001)\n", id); return 1; }
+			s_card_at_cycle = machine_seconds_to_cycles(t);
+		}
 		else if (!strcmp(a, "--headless")) headless = 1;
 		else if (!strcmp(a, "--seconds")) seconds = atof(NEXT());
 		else if (!strcmp(a, "--frames")) frames = strtoull(NEXT(), NULL, 0);
