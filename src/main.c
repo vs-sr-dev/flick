@@ -270,7 +270,99 @@ static void screenshot(void)
 
 static void release_pad(void)
 {
-	for (int b = 0; b < BTN_COUNT; b++) input_set(0, b, 0);
+	input_release_all();
+}
+
+/* ---- game controllers: the first one is player 1, the second player 2 ---- */
+static SDL_GameController *s_ctrl[2];
+static int s_ctrl_hold[2];           /* ignore the buttons until released (panel closed by A) */
+static int s_kbd_pad;                /* the player the keyboard plays */
+
+/* the keyboard takes the first player without a controller (player 1 if both have one,
+ * alongside the first pad); a change is appended to the message m */
+static void keyboard_assign(char *m, size_t n)
+{
+	const int pad = !s_ctrl[0] ? 0 : !s_ctrl[1] ? 1 : 0;
+	if (pad == s_kbd_pad) return;
+	input_release_keys();
+	s_kbd_pad = pad;
+	const size_t l = strlen(m);
+	snprintf(m + l, n - l, ", keyboard: player %d", pad + 1);
+}
+
+static void controller_added(int device)
+{
+	char m[200];
+	for (int p = 0; p < 2; p++)
+		if (!s_ctrl[p])
+		{
+			if (!(s_ctrl[p] = SDL_GameControllerOpen(device))) return;
+			snprintf(m, sizeof(m), "Player %d: %s", p + 1, SDL_GameControllerName(s_ctrl[p]));
+			keyboard_assign(m, sizeof(m));
+			ui_toast(m);
+			hs_log("%s\n", m);
+			return;
+		}
+}
+
+static void controller_removed(SDL_JoystickID id)
+{
+	char m[200];
+	for (int p = 0; p < 2; p++)
+		if (s_ctrl[p] && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(s_ctrl[p])) == id)
+		{
+			SDL_GameControllerClose(s_ctrl[p]);
+			s_ctrl[p] = NULL;
+			input_joy(p, 0, 0, 0);
+			snprintf(m, sizeof(m), "Player %d: controller disconnected", p + 1);
+			keyboard_assign(m, sizeof(m));
+			ui_toast(m);
+		}
+}
+
+/* colours as on the Xbox pad: A green, B red, X blue, Y yellow */
+static void controllers_poll(void)
+{
+	static const struct { SDL_GameControllerButton b; int btn; } map[] = {
+		{ SDL_CONTROLLER_BUTTON_A, BTN_GREEN }, { SDL_CONTROLLER_BUTTON_B, BTN_RED },
+		{ SDL_CONTROLLER_BUTTON_X, BTN_BLUE }, { SDL_CONTROLLER_BUTTON_Y, BTN_YELLOW },
+		{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, BTN_LSHOULDER },
+		{ SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, BTN_RSHOULDER },
+		{ SDL_CONTROLLER_BUTTON_START, BTN_START }, { SDL_CONTROLLER_BUTTON_BACK, BTN_SELECT },
+		{ SDL_CONTROLLER_BUTTON_DPAD_UP, BTN_UP }, { SDL_CONTROLLER_BUTTON_DPAD_DOWN, BTN_DOWN },
+		{ SDL_CONTROLLER_BUTTON_DPAD_LEFT, BTN_LEFT }, { SDL_CONTROLLER_BUTTON_DPAD_RIGHT, BTN_RIGHT },
+	};
+	for (int p = 0; p < 2; p++)
+	{
+		SDL_GameController *c = s_ctrl[p];
+		if (!c) continue;
+		uint32_t btn = 0;
+		for (int i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
+			if (SDL_GameControllerGetButton(c, map[i].b)) btn |= 1u << map[i].btn;
+		if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16000) btn |= 1u << BTN_LTRIGGER;
+		if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000) btn |= 1u << BTN_RTRIGGER;
+		if (s_ctrl_hold[p] && btn) btn = 0;
+		else s_ctrl_hold[p] = 0;
+		input_joy(p, btn, SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_LEFTX),
+			SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_LEFTY));
+	}
+}
+
+/* the card panel from a controller: d-pad, shoulders to page, A to place, B to close */
+static void controller_panel(int button)
+{
+	static const struct { int b, ui; } map[] = {
+		{ SDL_CONTROLLER_BUTTON_DPAD_UP, UI_UP }, { SDL_CONTROLLER_BUTTON_DPAD_DOWN, UI_DOWN },
+		{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, UI_PGUP }, { SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, UI_PGDN },
+		{ SDL_CONTROLLER_BUTTON_A, UI_ENTER }, { SDL_CONTROLLER_BUTTON_B, UI_CLOSE },
+	};
+	for (int i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
+		if (button == map[i].b) ui_key(map[i].ui);
+	if (!ui_panel_open())
+	{
+		SDL_StopTextInput();
+		s_ctrl_hold[0] = s_ctrl_hold[1] = 1;
+	}
 }
 
 static void toggle_panel(void)
@@ -400,7 +492,7 @@ static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDevi
 	if (k->repeat || s_paused) return;
 	for (int i = 0; i < (int)(sizeof(s_keymap) / sizeof(s_keymap[0])); i++)
 		if (k->keysym.scancode == s_keymap[i].sc)
-			input_set(0, s_keymap[i].button, down);
+			input_set(s_kbd_pad, s_keymap[i].button, down);
 }
 
 static tb_state toolbar_state(void)
@@ -418,7 +510,7 @@ static tb_state toolbar_state(void)
 
 static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) != 0)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 	{
 		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
 		return 1;
@@ -495,6 +587,15 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 				if (tb_visible(&st, now) && tb_wheel(s_mouse_x, s_mouse_y, ev.wheel.y, s_volume, &value) == TB_VOLUME)
 					command(TB_VOLUME, value, win, audio);
 				break;
+			case SDL_CONTROLLERDEVICEADDED:
+				controller_added(ev.cdevice.which);
+				break;
+			case SDL_CONTROLLERDEVICEREMOVED:
+				controller_removed(ev.cdevice.which);
+				break;
+			case SDL_CONTROLLERBUTTONDOWN:
+				if (ui_panel_open()) controller_panel(ev.cbutton.button);
+				break;
 			case SDL_TEXTINPUT:
 				if (ui_panel_open()) ui_text(ev.text.text);
 				break;
@@ -505,6 +606,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 			}
 		}
 		timed_updates();
+		if (!ui_panel_open() && !s_paused) controllers_poll();
 
 		if (ui_panel_open() || s_paused)
 		{
@@ -580,6 +682,8 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 		if (frames && g_frame_count >= frames) break;
 	}
 	if (audio) SDL_CloseAudioDevice(audio);
+	for (int p = 0; p < 2; p++)
+		if (s_ctrl[p]) SDL_GameControllerClose(s_ctrl[p]);
 	SDL_DestroyTexture(otex);
 	SDL_DestroyTexture(tex);
 	SDL_DestroyRenderer(ren);

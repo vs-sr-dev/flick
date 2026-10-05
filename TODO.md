@@ -61,7 +61,13 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       (insieme alla scelta del BIOS all'avvio).
 - [ ] Percorsi non ASCII: i file trascinati arrivano in UTF-8, `fopen` vuole la codepage
       ANSI (oggi "Cannot open"). Il dialogo nativo usa ANSI e funziona.
-- [ ] Gamepad (SDL GameController) e secondo giocatore (porta I2C 1).
+- [x] Gamepad (SDL GameController) e secondo giocatore (porta I2C 1): primo pad =
+      giocatore 1, secondo = giocatore 2, collegamento a caldo; colori Xbox = colori
+      HyperScan; la tastiera prende il primo giocatore senza pad (con un pad solo è il
+      giocatore 2; con due torna sull'1, sommata al pad: fonti separate in `input.c`);
+      pannello carte navigabile col pad. **Da provare dall'utente** (pad Xbox One).
+- [ ] Gamepad: aprire il pannello carte dal pad (una combinazione, es. View+LB) e
+      rimappatura dei tasti nel file di configurazione.
 - [ ] Save state (CPU, RAM, device, scheduler; formato versionato).
 - [ ] Avvio senza argomenti: dialogo per scegliere BIOS e disco, ricordati in un file di
       configurazione.

@@ -55,6 +55,13 @@ independent project, not affiliated with Mattel or Sunplus.
 Pad: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
 A/S = shoulders, Q/W = triggers.
 
+Game controllers (anything SDL knows as a game controller, e.g. Xbox or PlayStation pads):
+the first one plugged in is player 1, the second player 2. The keyboard takes the first
+player without a controller: player 1 with none, player 2 with one (so a pad and the
+keyboard make two players), player 1 again, alongside the first pad, with two. On an Xbox pad the colours match: A green, B red, X blue, Y yellow; LB/RB are the
+shoulders, LT/RT the triggers, Menu is start, View is select, the left stick and the d-pad
+the stick. In the card panel the d-pad moves, LB/RB page, A places the card, B closes.
+
 Moving the mouse shows a toolbar along the top of the window; it hides again after a few
 seconds. Its buttons, with their keys:
 

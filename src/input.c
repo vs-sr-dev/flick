@@ -21,16 +21,80 @@ int input_button_id(const char *name)
 	return -1;
 }
 
+/* each source keeps its own state, merged into g_pad: releasing a key does not centre a
+ * stick held on the controller */
+static uint32_t s_keys[2], s_joy_btn[2];
+static int s_joy_x[2], s_joy_y[2];
+
+#define DEADZONE 8000
+
+/* SDL axis to a port value: 0x7f at rest, reversed (up/left = 0xff), dead zone removed */
+static int axis_value(int a)
+{
+	if (a > -DEADZONE && a < DEADZONE) return 0x7f;
+	const int m = a < 0 ? -a : a;
+	int d = (m - DEADZONE) * 128 / (32768 - DEADZONE);
+	if (d > 128) d = 128;
+	const int v = a < 0 ? 0x7f + d : 0x7f - d;
+	return v < 0 ? 0 : v > 0xff ? 0xff : v;
+}
+
+/* a direction: full deflection (keys, d-pad), else the stick */
+static uint8_t stick(uint32_t btn, int neg, int pos, int analog)
+{
+	if (btn & (1u << neg)) return 0xff;
+	if (btn & (1u << pos)) return 0x00;
+	return (uint8_t)analog;
+}
+
+static void merge(int pad)
+{
+	const uint32_t btn = s_keys[pad] | s_joy_btn[pad];
+	uint8_t p0 = 0, p1 = 0;
+	for (int b = 0; b < BTN_COUNT; b++)
+		if ((btn >> b) & 1)
+		{
+			if (s_btn[b].port == 0) p0 |= s_btn[b].bit;
+			else if (s_btn[b].port == 1) p1 |= s_btn[b].bit;
+		}
+	g_pad[pad][0] = p0;
+	g_pad[pad][1] = p1;
+	g_pad[pad][2] = stick(btn, BTN_UP, BTN_DOWN, axis_value(s_joy_y[pad]));
+	g_pad[pad][3] = stick(btn, BTN_LEFT, BTN_RIGHT, axis_value(s_joy_x[pad]));
+}
+
 void input_set(int pad, int button, int down)
 {
-	const int port = s_btn[button].port;
-	if (port < 2)
+	if (down) s_keys[pad] |= 1u << button;
+	else s_keys[pad] &= ~(1u << button);
+	merge(pad);
+}
+
+void input_joy(int pad, uint32_t buttons, int x, int y)
+{
+	s_joy_btn[pad] = buttons;
+	s_joy_x[pad] = x;
+	s_joy_y[pad] = y;
+	merge(pad);
+}
+
+void input_release_keys(void)
+{
+	for (int pad = 0; pad < 2; pad++)
 	{
-		if (down) g_pad[pad][port] |= s_btn[button].bit;
-		else g_pad[pad][port] &= ~s_btn[button].bit;
+		s_keys[pad] = 0;
+		merge(pad);
 	}
-	else                                     /* stick: full deflection or centre */
-		g_pad[pad][port] = down ? s_btn[button].bit : 0x7f;
+}
+
+void input_release_all(void)
+{
+	for (int pad = 0; pad < 2; pad++)
+	{
+		s_keys[pad] = s_joy_btn[pad] = 0;
+		s_joy_x[pad] = s_joy_y[pad] = 0;
+		merge(pad);
+	}
 }
 
 typedef struct { double t; int pad, button, down; } in_event;
