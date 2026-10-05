@@ -22,6 +22,7 @@ typedef struct emu_timer {
 	const char *name;
 } emu_timer;
 
+void sched_reset(void);         /* drop every timer (before the devices allocate theirs) */
 emu_timer *timer_alloc(timer_cb cb, void *ctx, const char *name);
 /* delay from now; period 0 = one-shot */
 void timer_adjust(emu_timer *t, atto_t delay, int param, atto_t period);

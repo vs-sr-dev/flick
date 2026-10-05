@@ -102,6 +102,7 @@ void machine_reset(cdimg *cd)
 	memset(g_sram, 0, sizeof(g_sram));
 	s_gpio_out = 0;
 
+	sched_reset();
 	score7_reset();
 	timers_init();
 	i2c_init();

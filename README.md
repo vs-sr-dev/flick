@@ -52,9 +52,27 @@ independent project, not affiliated with Mattel or Sunplus.
 | `--log-uart` | print the BIOS debug UART on stderr |
 | `-v` | verbose log |
 
-Keys: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
-A/S = shoulders, Q/W = triggers, F1 = cards, F2 = take the card off, F3 = switch timing,
-Esc = quit.
+Pad: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
+A/S = shoulders, Q/W = triggers.
+
+Moving the mouse shows a toolbar along the top of the window; it hides again after a few
+seconds. Its buttons, with their keys:
+
+| Button | Key | |
+|-|-|-|
+| disc | Ctrl+O | open a `.cue` or `.iso` (or drop it on the window): the console restarts with it |
+| card | F1 | the card panel: pick a card and put it on the reader |
+| eject | F2 | take the card off the reader |
+| pause | P, Pause | pause and resume |
+| reset | F5 | restart the console (the disc and the card stay) |
+| FAST / MAME | F3 | switch the timing preset (see below) |
+| camera | F12 | save a screenshot in `screenshots/` next to the executable |
+| 1x / 2x | | window size |
+| full screen | F11, Alt+Enter | full screen and back (Esc also leaves it) |
+| speaker, slider | | mute, volume (the mouse wheel works on them too) |
+
+Esc quits. Cards that a game writes to are saved in `cards/` next to the executable
+(`--cards-dir` to change it).
 
 ### Timing
 

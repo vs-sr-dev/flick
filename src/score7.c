@@ -1331,16 +1331,18 @@ static void idle_check(void)
 	memcpy(s_loop_regs, g_cpu.gpr, LOOP_REGS);
 }
 
-void score7_reset(void)
-{
-	memset(&g_cpu, 0, sizeof(g_cpu));
-	g_cpu.cpi = 6;
-	REG_EXCPVEC = m_pc = 0x9f000000;
-}
-
 /* queued interrupt requests, delivered at the next instruction boundary */
 static int s_inq[64];
 static int s_inq_n;
+
+void score7_reset(void)
+{
+	memset(&g_cpu, 0, sizeof(g_cpu));
+	s_inq_n = 0;
+	s_loop_pc = 1;
+	g_cpu.cpi = 6;
+	REG_EXCPVEC = m_pc = 0x9f000000;
+}
 
 void score7_set_input(int line)
 {

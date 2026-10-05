@@ -23,6 +23,14 @@ static void recompute(void)
 	g_next_event_cycle = (m == ATTO_NEVER) ? UINT64_MAX : (uint64_t)(m / s_aps);
 }
 
+void sched_reset(void)
+{
+	s_count = 0;
+	s_seq = 0;
+	s_cb_timer = NULL;
+	g_next_event_cycle = UINT64_MAX;
+}
+
 emu_timer *timer_alloc(timer_cb cb, void *ctx, const char *name)
 {
 	if (s_count == MAX_TIMERS) hs_fatal("too many timers");

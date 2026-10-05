@@ -15,6 +15,8 @@
 #include "card.h"
 #include "cards.h"
 #include "ui.h"
+#include "toolbar.h"
+#include "os.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -55,7 +57,7 @@ static void usage(void)
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
 		"  --card-at T:ID     place catalogue card ID (e.g. xmen001) on the reader at T s\n"
 		"  --cards-dir DIR    where cards placed from the F1 panel keep their saves\n"
-		"                     (default: cards)\n"
+		"                     (default: the cards folder next to the executable)\n"
 		"  --headless         no window, no audio\n"
 		"  --seconds S        stop after S emulated seconds\n"
 		"  --frames N         stop after N video frames\n"
@@ -95,6 +97,8 @@ static void set_timing(int fast)
 	g_spu_bios_dac = fast;
 	g_i2c_sysclk = fast;
 }
+
+static cdimg *s_cd;                  /* the disc in the tray, NULL: none */
 
 /* --cpi-at T:N: switch the CPI at emulated time T (timing experiments) */
 static uint64_t s_cpi_at_cycle = UINT64_MAX;
@@ -186,7 +190,233 @@ static const struct { SDL_Scancode sc; int button; } s_keymap[] = {
 	{ SDL_SCANCODE_Q, BTN_LTRIGGER }, { SDL_SCANCODE_W, BTN_RTRIGGER },
 };
 
-static int run_window(uint64_t end_cycle, uint64_t frames)
+/* ---- console controls: toolbar, keys, files dropped on the window ---- */
+static int s_paused, s_volume = 100, s_muted, s_scale = 1, s_fullscreen;
+static int s_mouse_x = -1, s_mouse_y = -1;
+
+static const char *base_name(const char *p)
+{
+	const char *b = p;
+	for (const char *q = p; *q; q++)
+		if (*q == '/' || *q == '\\') b = q + 1;
+	return b;
+}
+
+static void window_title(SDL_Window *win, const char *path)
+{
+	char t[300];
+	const int game = cards_detect_game(s_cd);
+	if (game != CARD_ANY) snprintf(t, sizeof(t), "HyperScanEmu - %s", cards_game_name(game));
+	else if (path) snprintf(t, sizeof(t), "HyperScanEmu - %s", base_name(path));
+	else snprintf(t, sizeof(t), "HyperScanEmu");
+	SDL_SetWindowTitle(win, t);
+}
+
+/* power cycle: the disc, the card on the reader and the timing stay */
+static void console_reset(void)
+{
+	const int cpi = g_cpu.cpi, idle = g_cpu.idle_skip, io = g_cpu.io_cycles;
+	machine_reset(s_cd);
+	g_cpu.cpi = cpi;
+	g_cpu.idle_skip = idle;
+	g_cpu.io_cycles = io;
+	ui_init(cards_detect_game(s_cd));
+}
+
+/* a new disc: the console restarts from the BIOS with it */
+static void open_disc(SDL_Window *win, const char *path)
+{
+	char m[300];
+	cdimg *cd = cdimg_open(path);
+	if (!cd)
+	{
+		snprintf(m, sizeof(m), "Cannot open %s", base_name(path));
+		ui_toast(m);
+		return;
+	}
+	if (s_cd) cdimg_close(s_cd);
+	s_cd = cd;
+	console_reset();
+	window_title(win, path);
+	snprintf(m, sizeof(m), "Disc: %s", base_name(path));
+	ui_toast(m);
+}
+
+/* screenshots/hyperscan-YYYYMMDD-HHMMSS[-n].png next to the executable */
+static void screenshot(void)
+{
+	char dir[1024], name[64], path[1200], m[1300];
+	os_exe_dir(dir, sizeof(dir));
+	snprintf(path, sizeof(path), "%s/screenshots", dir);
+	os_mkdir(path);
+	const time_t t = time(NULL);
+	char stamp[32];
+	strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", localtime(&t));
+	for (int n = 1; ; n++)
+	{
+		if (n == 1) snprintf(name, sizeof(name), "hyperscan-%s.png", stamp);
+		else snprintf(name, sizeof(name), "hyperscan-%s-%d.png", stamp, n);
+		snprintf(path, sizeof(path), "%s/screenshots/%s", dir, name);
+		FILE *f = fopen(path, "rb");
+		if (!f) break;
+		fclose(f);
+	}
+	if (png_write(path, &g_frame[0][0], 640, screen_width(), screen_height()))
+		snprintf(m, sizeof(m), "Saved screenshots/%s", name);
+	else
+		snprintf(m, sizeof(m), "Cannot write %s", path);
+	ui_toast(m);
+}
+
+static void release_pad(void)
+{
+	for (int b = 0; b < BTN_COUNT; b++) input_set(0, b, 0);
+}
+
+static void toggle_panel(void)
+{
+	ui_panel_toggle();
+	if (ui_panel_open())
+	{
+		release_pad();                       /* no stuck buttons */
+		SDL_StartTextInput();
+	}
+	else
+		SDL_StopTextInput();
+}
+
+/* the largest whole multiple of 640x480 that fits the window's display */
+static int max_scale(SDL_Window *win)
+{
+	SDL_Rect r;
+	const int d = SDL_GetWindowDisplayIndex(win);
+	if (d < 0 || SDL_GetDisplayUsableBounds(d, &r) != 0) return 1;
+	int k = r.w / 640;
+	if ((r.h - 40) / 480 < k) k = (r.h - 40) / 480;   /* room for the title bar */
+	return k < 1 ? 1 : k;
+}
+
+static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio)
+{
+	switch (cmd)
+	{
+	case TB_DISC:
+	{
+		char p[1024];
+		if (os_pick_disc(win, p, sizeof(p)))
+			open_disc(win, p);
+#ifndef _WIN32
+		else
+			ui_toast("Drop a .cue or .iso file on the window");
+#endif
+		break;
+	}
+	case TB_CARDS: toggle_panel(); break;
+	case TB_CARD_OFF: ui_key(UI_REMOVE); break;
+	case TB_PAUSE:
+		s_paused = !s_paused;
+		if (s_paused)
+		{
+			release_pad();
+			if (audio) SDL_ClearQueuedAudio(audio);
+		}
+		break;
+	case TB_RESET:
+		console_reset();
+		ui_toast("Reset");
+		break;
+	case TB_TIMING:
+	{
+		const int fast = g_cpu.cpi == 6;
+		set_timing(fast);
+		ui_toast(fast ? "Timing: fast (CPI 1)" : "Timing: MAME (CPI 6, frame vblank)");
+		break;
+	}
+	case TB_SHOT: screenshot(); break;
+	case TB_SCALE:
+		if (s_fullscreen) break;
+		s_scale = s_scale % max_scale(win) + 1;
+		SDL_SetWindowSize(win, 640 * s_scale, 480 * s_scale);
+		SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(win)),
+			SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(win)));
+		break;
+	case TB_FULLSCREEN:
+		s_fullscreen = !s_fullscreen;
+		SDL_SetWindowFullscreen(win, s_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+		break;
+	case TB_MUTE: s_muted = !s_muted; break;
+	case TB_VOLUME:
+		s_volume = value;
+		if (value > 0) s_muted = 0;
+		break;
+	}
+}
+
+static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDeviceID audio)
+{
+	const int down = k->type == SDL_KEYDOWN;
+	const SDL_Keycode sym = k->keysym.sym;
+	const int alt = (k->keysym.mod & KMOD_ALT) != 0, ctrl = (k->keysym.mod & KMOD_CTRL) != 0;
+
+	if (down && !k->repeat)
+	{
+		int cmd = TB_NONE;
+		if (sym == SDLK_F11 || (sym == SDLK_RETURN && alt)) cmd = TB_FULLSCREEN;
+		else if (sym == SDLK_o && ctrl) cmd = TB_DISC;
+		else if (sym == SDLK_F1) cmd = TB_CARDS;
+		else if (sym == SDLK_F2) cmd = TB_CARD_OFF;
+		else if (sym == SDLK_F3) cmd = TB_TIMING;
+		else if (sym == SDLK_F5) cmd = TB_RESET;
+		else if (sym == SDLK_F12) cmd = TB_SHOT;
+		else if (sym == SDLK_PAUSE || (sym == SDLK_p && !ui_panel_open())) cmd = TB_PAUSE;
+		if (cmd != TB_NONE)
+		{
+			command(cmd, 0, win, audio);
+			return;
+		}
+	}
+	if (sym == SDLK_RETURN && alt) return;      /* not Start */
+
+	if (ui_panel_open())
+	{
+		static const struct { SDL_Keycode k; int ui; } map[] = {
+			{ SDLK_UP, UI_UP }, { SDLK_DOWN, UI_DOWN }, { SDLK_PAGEUP, UI_PGUP },
+			{ SDLK_PAGEDOWN, UI_PGDN }, { SDLK_HOME, UI_HOME }, { SDLK_END, UI_END },
+			{ SDLK_RETURN, UI_ENTER }, { SDLK_KP_ENTER, UI_ENTER },
+			{ SDLK_BACKSPACE, UI_BACKSPACE }, { SDLK_ESCAPE, UI_CLOSE }, { SDLK_TAB, UI_TAB },
+		};
+		if (!down) return;
+		for (int i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
+			if (sym == map[i].k) ui_key(map[i].ui);
+		if (!ui_panel_open()) SDL_StopTextInput();
+		return;
+	}
+	if (down && sym == SDLK_ESCAPE)
+	{
+		if (s_fullscreen) command(TB_FULLSCREEN, 0, win, audio);
+		else g_quit = 1;
+		return;
+	}
+	if (k->repeat || s_paused) return;
+	for (int i = 0; i < (int)(sizeof(s_keymap) / sizeof(s_keymap[0])); i++)
+		if (k->keysym.scancode == s_keymap[i].sc)
+			input_set(0, s_keymap[i].button, down);
+}
+
+static tb_state toolbar_state(void)
+{
+	tb_state st;
+	st.paused = s_paused;
+	st.fast = g_cpu.cpi != 6;
+	st.fullscreen = s_fullscreen;
+	st.scale = s_scale;
+	st.volume = s_volume;
+	st.muted = s_muted;
+	st.card_on = cards_current() != NULL || card_loaded();
+	return st;
+}
+
+static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) != 0)
 	{
@@ -196,8 +426,9 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 	SDL_Window *win = SDL_CreateWindow("HyperScanEmu", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		640, 480, SDL_WINDOW_RESIZABLE);
 	SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	SDL_RenderSetLogicalSize(ren, 640, 480);
+	SDL_RenderSetLogicalSize(ren, 640, 480);     /* also maps mouse events to 640x480 */
 	SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, 640, 480);
+	window_title(win, cdpath);
 
 	SDL_AudioSpec want = { 0 }, have;
 	want.freq = SPU_OUT_RATE;
@@ -218,7 +449,8 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 	SDL_SetTextureBlendMode(otex, SDL_BLENDMODE_BLEND);
 	static uint32_t overlay[480 * 640];
 	SDL_StopTextInput();
-	ui_toast("F1: cards");
+	tb_show((double)SDL_GetTicks() / 1000.0);
+	int cursor = 1;
 
 	const uint64_t slice = CPU_CLOCK / 60;
 	uint64_t t0 = SDL_GetPerformanceCounter(), c0 = g_cpu.cycles;
@@ -228,56 +460,55 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 		SDL_Event ev;
 		while (SDL_PollEvent(&ev))
 		{
-			if (ev.type == SDL_QUIT)
+			const double now = (double)SDL_GetTicks() / 1000.0;
+			const tb_state st = toolbar_state();
+			int value = 0, cmd = TB_NONE;
+			switch (ev.type)
+			{
+			case SDL_QUIT:
 				g_quit = 1;
-			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F1)
-			{
-				ui_panel_toggle();
-				if (ui_panel_open())
-				{
-					for (int b = 0; b < BTN_COUNT; b++) input_set(0, b, 0);   /* no stuck buttons */
-					SDL_StartTextInput();
-				}
-				else
-					SDL_StopTextInput();
+				break;
+			case SDL_DROPFILE:
+				open_disc(win, ev.drop.file);
+				SDL_free(ev.drop.file);
+				break;
+			case SDL_WINDOWEVENT:
+				if (ev.window.event == SDL_WINDOWEVENT_LEAVE) tb_leave();
+				break;
+			case SDL_MOUSEMOTION:
+				s_mouse_x = ev.motion.x;
+				s_mouse_y = ev.motion.y;
+				if (tb_mouse(s_mouse_x, s_mouse_y, now, &value) == TB_VOLUME)
+					command(TB_VOLUME, value, win, audio);
+				break;
+			case SDL_MOUSEBUTTONDOWN:
+				if (ev.button.button != SDL_BUTTON_LEFT || ui_panel_open()) break;
+				/* a click on a hidden toolbar only shows it */
+				if (tb_visible(&st, now)) cmd = tb_press(ev.button.x, ev.button.y, now, &value);
+				else tb_mouse(ev.button.x, ev.button.y, now, &value);
+				if (cmd != TB_NONE) command(cmd, value, win, audio);
+				break;
+			case SDL_MOUSEBUTTONUP:
+				if (ev.button.button == SDL_BUTTON_LEFT) tb_release();
+				break;
+			case SDL_MOUSEWHEEL:
+				if (tb_visible(&st, now) && tb_wheel(s_mouse_x, s_mouse_y, ev.wheel.y, s_volume, &value) == TB_VOLUME)
+					command(TB_VOLUME, value, win, audio);
+				break;
+			case SDL_TEXTINPUT:
+				if (ui_panel_open()) ui_text(ev.text.text);
+				break;
+			case SDL_KEYDOWN:
+			case SDL_KEYUP:
+				key_event(&ev.key, win, audio);
+				break;
 			}
-			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F2)
-				ui_key(UI_REMOVE);
-			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F3)
-			{
-				const int fast = g_cpu.cpi == 6;
-				set_timing(fast);
-				ui_toast(fast ? "Timing: fast (CPI 1)" : "Timing: MAME (CPI 6, frame vblank)");
-			}
-			else if (ui_panel_open())
-			{
-				if (ev.type == SDL_TEXTINPUT)
-					ui_text(ev.text.text);
-				else if (ev.type == SDL_KEYDOWN)
-				{
-					static const struct { SDL_Keycode k; int ui; } map[] = {
-						{ SDLK_UP, UI_UP }, { SDLK_DOWN, UI_DOWN }, { SDLK_PAGEUP, UI_PGUP },
-						{ SDLK_PAGEDOWN, UI_PGDN }, { SDLK_HOME, UI_HOME }, { SDLK_END, UI_END },
-						{ SDLK_RETURN, UI_ENTER }, { SDLK_KP_ENTER, UI_ENTER },
-						{ SDLK_BACKSPACE, UI_BACKSPACE }, { SDLK_ESCAPE, UI_CLOSE }, { SDLK_TAB, UI_TAB },
-					};
-					for (int k = 0; k < (int)(sizeof(map) / sizeof(map[0])); k++)
-						if (ev.key.keysym.sym == map[k].k) ui_key(map[k].ui);
-					if (!ui_panel_open()) SDL_StopTextInput();
-				}
-			}
-			else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
-				g_quit = 1;
-			else if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) && !ev.key.repeat)
-				for (int k = 0; k < (int)(sizeof(s_keymap) / sizeof(s_keymap[0])); k++)
-					if (ev.key.keysym.scancode == s_keymap[k].sc)
-						input_set(0, s_keymap[k].button, ev.type == SDL_KEYDOWN);
 		}
 		timed_updates();
 
-		if (ui_panel_open())
+		if (ui_panel_open() || s_paused)
 		{
-			/* paused: keep the pacing baseline with the wall clock */
+			/* stopped: keep the pacing baseline with the wall clock */
 			t0 = SDL_GetPerformanceCounter();
 			c0 = g_cpu.cycles;
 		}
@@ -287,6 +518,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 			 * are queued (at most 100 ms of emulation per pass, so input stays live
 			 * when the host cannot keep up) */
 			const uint32_t low = SPU_OUT_RATE * 4 * 60 / 1000;
+			const int gain = s_muted ? 0 : s_volume;
 			for (int i = 0; i < 25 && SDL_GetQueuedAudioSize(audio) < low; i++)
 			{
 				uint64_t target = g_cpu.cycles + CPU_CLOCK / 250;
@@ -295,8 +527,10 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 				spu_sync();
 				for (uint32_t n; (n = spu_take(abuf, 8192)) > 0; )
 				{
-					SDL_QueueAudio(audio, abuf, n * 4);
 					wav_write(abuf, n);
+					if (gain != 100)
+						for (uint32_t s = 0; s < n * 2; s++) abuf[s] = (int16_t)(abuf[s] * gain / 100);
+					SDL_QueueAudio(audio, abuf, n * 4);
 				}
 				if (end_cycle && g_cpu.cycles >= end_cycle) break;
 			}
@@ -310,20 +544,32 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 			machine_run_until(target);
 		}
 
+		const double now = (double)SDL_GetTicks() / 1000.0;
+		const tb_state st = toolbar_state();
 		const int w = screen_width(), h = screen_height();
 		SDL_UpdateTexture(tex, NULL, g_frame, sizeof(g_frame[0]));
 		SDL_Rect src = { 0, 0, w, h };
 		SDL_RenderClear(ren);
 		SDL_RenderCopy(ren, tex, &src, NULL);
-		if (ui_render(overlay, (double)SDL_GetTicks() / 1000.0))
+		int drawn = ui_render(overlay, now);
+		if (!ui_panel_open()) drawn |= tb_render(overlay, &st, now);
+		if (drawn)
 		{
 			SDL_UpdateTexture(otex, NULL, overlay, 640 * 4);
 			SDL_RenderCopy(ren, otex, NULL, NULL);
 		}
 		SDL_RenderPresent(ren);
 
+		/* full screen: the pointer hides with the toolbar */
+		const int want_cursor = !s_fullscreen || tb_visible(&st, now);
+		if (want_cursor != cursor)
+		{
+			SDL_ShowCursor(want_cursor ? SDL_ENABLE : SDL_DISABLE);
+			cursor = want_cursor;
+		}
+
 		/* without audio: real-time pacing on emulated time */
-		if (!audio)
+		if (!audio && !s_paused && !ui_panel_open())
 		{
 			const double emu_s = (double)(g_cpu.cycles - c0) / CPU_CLOCK;
 			const double host_s = (double)(SDL_GetPerformanceCounter() - t0) / freq;
@@ -346,7 +592,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 int main(int argc, char **argv)
 {
 	const char *bios = NULL, *shot = NULL, *wav = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
-	int headless = 0, cpi = 0, io_cycles = 0, fast = 1;
+	int headless = 0, cpi = 0, io_cycles = 0, fast = 1, field_vblank = 0;
 	double seconds = 0;
 	uint64_t frames = 0;
 
@@ -390,7 +636,7 @@ int main(int argc, char **argv)
 			s_cpi_at = n;
 		}
 		else if (!strcmp(a, "--io-cycles")) io_cycles = atoi(NEXT());
-		else if (!strcmp(a, "--field-vblank")) g_field_vblank = 1;
+		else if (!strcmp(a, "--field-vblank")) field_vblank = 1;
 		else if (!strcmp(a, "--mark")) g_mark_pc = (uint32_t)strtoul(NEXT(), NULL, 16);
 		else if (!strcmp(a, "--input")) { if (!input_script_parse(NEXT())) usage(); }
 		else if (!strcmp(a, "--log-uart")) g_log_uart = 1;
@@ -404,15 +650,22 @@ int main(int argc, char **argv)
 		fprintf(stderr, "cannot read BIOS %s\n", bios);
 		return 1;
 	}
-	cdimg *cd = NULL;
-	if (cdpath && !(cd = cdimg_open(cdpath)))
+	if (cdpath && !(s_cd = cdimg_open(cdpath)))
 	{
 		fprintf(stderr, "cannot open disc image %s (-v for details)\n", cdpath);
 		return 1;
 	}
-	machine_reset(cd);
-	if (cardsdir) cards_set_dir(cardsdir);
-	ui_init(cards_detect_game(cd));
+	machine_reset(s_cd);
+	if (cardsdir)
+		cards_set_dir(cardsdir);
+	else
+	{
+		char dir[1024], cards[1100];
+		os_exe_dir(dir, sizeof(dir));
+		snprintf(cards, sizeof(cards), "%s/cards", dir);
+		cards_set_dir(cards);
+	}
+	ui_init(cards_detect_game(s_cd));
 	if (cardpath && !card_load(cardpath))
 	{
 		fprintf(stderr, "cannot read card image %s (120 bytes expected)\n", cardpath);
@@ -420,6 +673,7 @@ int main(int argc, char **argv)
 	}
 	if (trace) fast = 0;                     /* traces compare with MAME */
 	set_timing(fast);
+	if (field_vblank) g_field_vblank = 1;
 	if (cpi) g_cpu.cpi = cpi;
 	g_cpu.io_cycles = io_cycles;
 	if (trace && !trace_open(trace))
@@ -443,7 +697,7 @@ int main(int argc, char **argv)
 	int rc;
 #ifdef HS_HAVE_SDL
 	if (!headless)
-		rc = run_window(end_cycle, frames);
+		rc = run_window(end_cycle, frames, cdpath);
 	else
 #endif
 	{

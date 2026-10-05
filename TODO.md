@@ -48,16 +48,18 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 ## Prossima sessione
 
 ### 1. Comodità del frontend
-- [ ] **Toolbar in cima alla finestra** per le opzioni: aprire un disco, carte (= F1),
-      togliere la carta, timing fast/mame, schermo intero, scala della finestra, volume,
-      screenshot, pausa, reset; più avanti save state. Decidere fra una barra disegnata da
-      noi (stesso font e stile del pannello carte, portabile, a scomparsa quando il mouse
-      esce) e un menu Win32 nativo via `SDL_SysWMinfo` (solo Windows). Proposta: disegnata
-      da noi.
-- [ ] Cartella `cards` accanto all'eseguibile, non nella cartella corrente (oggi finisce
-      dove si lancia il programma). Spostare l'attuale `cards/xmen001.bin` (10 punti
-      esperienza dell'utente) nella nuova posizione.
-- [ ] Schermo intero (Alt+Invio), ridimensionamento con proporzioni, scala intera.
+- [x] **Toolbar** disegnata da noi (`src/toolbar.c`, icone 12x12, stile del pannello
+      carte, a scomparsa dopo 2,5 s): disco (dialogo nativo Windows, o file trascinato
+      sulla finestra), carte, togli carta, pausa, reset, FAST/MAME, screenshot, 1x/2x,
+      schermo intero, muto e volume. Tasti: Ctrl+O, F1, F2, P, F5, F3, F12, F11/Alt+Invio.
+      Il reset a runtime ha richiesto `sched_reset()`. **Da provare dall'utente.**
+- [x] Cartella `cards` (e `screenshots`) accanto all'eseguibile; `cards/xmen001.bin`
+      spostata in `build/cards/` (attenzione: cancellare `build/` la cancella).
+- [x] Schermo intero (F11, Alt+Invio; Esc ne esce), proporzioni conservate.
+- [ ] Ricordare volume, scala e ultima cartella dei dischi nel file di configurazione
+      (insieme alla scelta del BIOS all'avvio).
+- [ ] Percorsi non ASCII: i file trascinati arrivano in UTF-8, `fopen` vuole la codepage
+      ANSI (oggi "Cannot open"). Il dialogo nativo usa ANSI e funziona.
 - [ ] Gamepad (SDL GameController) e secondo giocatore (porta I2C 1).
 - [ ] Save state (CPU, RAM, device, scheduler; formato versionato).
 - [ ] Avvio senza argomenti: dialogo per scegliere BIOS e disco, ricordati in un file di
