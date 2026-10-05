@@ -2,157 +2,98 @@
 
 Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e uso).
 
-## Stato alla fine della sessione del 2026-10-04/05
+## Stato alla fine della sessione del 2026-10-05
 
-- **M1 fatto:** CPU S+core 7, bus, timer, I2C + pad, PPU, timing schermo/TV. Le prime 72 M
-  istruzioni del boot sono identiche al byte alla traccia di MAME; logo identico al pixel.
-- **M2 quasi fatto:** CD servo + immagini (cue a file singolo, ISO), SPU con audio SDL,
-  lettore RFID, pannello carte F1/F2 (445 carte dal catalogo CC0 di MAME, salvataggi in
-  `cards/<id>.bin`), input da tastiera e da script.
-- **Regressione:** `BIOS=... bash tools/regress.sh` = M1 + tracce sparse di X-Men,
-  Spider-Man, Marvel Heroes (60 s) e IWL (90 s): tutte identiche a MAME (circa 6 minuti).
-- **Timing:** preset `fast` predefinito = CPI 1, vblank per frame come MAME, decoder della
-  carta per rapporti, skip esatto dei loop d'attesa, timer analitici. X-Men combatte a
-  **30 fps, confermato dall'utente sui video reali** ("praticamente identico"); `--timing
-  mame` / F3 = MAME al ciclo. Host: circa 280% del tempo reale in combattimento.
-- **Gameplay verificato dall'utente (X-Men):** audio perfetto; carta personaggio, carta
-  della mossa finale eseguita; dopo il fight il gioco riscrive la carta (+10 esperienza,
-  byte 0x32 = 0x0a), salvata in `cards/xmen001.bin` e riconosciuta da Card Evaluation.
+- **M1 fatto:** CPU S+core 7, bus, timer, I2C + pad, PPU, timing schermo/TV; boot identico
+  al byte alla traccia di MAME per 72 M istruzioni, logo identico al pixel.
+- **M2 quasi fatto:** CD servo + immagini (cue a file singolo, ISO, MODE1/2352), SPU con
+  audio SDL, lettore RFID e pannello carte (445 carte, salvataggi in `cards/`).
+- **Tutti e cinque i giochi arrivano al gameplay.** Giocati dall'utente: X-Men (carte, mossa
+  finale, esperienza salvata sulla carta), Marvel Heroes e Ben 10 anche **in due**.
+- **Regressione:** `BIOS=... bash tools/regress.sh` = M1 + tracce sparse di 6 dischi (X-Men
+  ISO e dump USE2, Spider-Man, Marvel Heroes, IWL, Ben 10): tutte identiche a MAME.
+- **Timing:** preset `fast` predefinito (CPI 1, vblank per frame come MAME: X-Men a 30 fps
+  come sulle console vere); `--timing mame` / F3 = MAME al ciclo.
+- **Frontend:** toolbar (disco, carte, pausa, reset, timing, screenshot, scala, schermo
+  intero, volume), reset e cambio disco a runtime, gamepad e secondo giocatore (la
+  tastiera prende il primo giocatore libero), cartelle `cards/`, `screenshots/` e `debug/`
+  accanto all'eseguibile.
 
-## Sessione del 2026-10-05 (mattina): jingle del boot
-
-- [x] **Il boot ora suona** (preset `fast`). Non era un canale diverso: è il DAC FIFO, con
-      un loop KVAG (ADPCM, 22050 Hz, 2,5 s) che il BIOS decodifica in RAM. Tre cause:
-      1. il BIOS abilita la FIFO (0x1088 = 0x4007) *prima* di scrivere indirizzo e sample
-         clock: l'avvio veniva scartato (clock 0). Ora parte alla scrittura del clock;
-      2. 0x1034 = 0x10cb non ha il bit 9 che il fork prende per SoftCh; nel layout SPG2xx
-         (VolSel in 7:6, già usato) SoftCh è il bit 12, che hanno sia il BIOS sia i giochi
-         (0x168b). Verificato: tutti e quattro i giochi scrivono solo 0x168b/0x10cb;
-      3. il BIOS decodifica il jingle solo mentre aspetta il vblank (0xA001528C chiama il
-         servizio audio 0xA000A0A8), ma ogni frame legge 10 registri dei pad via I2C con
-         divisore 0x258: col clock di MAME (27 MHz / 4 / 601) sono 33,86 ms, un frame
-         intero, e l'attesa del vblank non attende mai. Con l'I2C a 108 MHz (clock di
-         sistema: MAME dà 27 MHz a tutte le periferiche) le letture prendono 1/4 di frame.
-- [x] `--wav FILE` registra l'audio (anche headless).
-- Verifiche: regressione identica a MAME (il preset `mame` non cambia); X-Men in
-  combattimento resta a 30,0 fps col nuovo I2C.
-- [x] **Confermato dall'utente:** è lo "zzzzzmmm" dell'animazione del logo HyperScan che
-      pulsa, finora muta.
-- [ ] **Da controllare coi video:** col nuovo I2C X-Men legge i pad 30 volte al secondo
-      nei menu invece di 15; se i menu sono legati al polling, potrebbero animarsi al
-      doppio. In combattimento nessun cambiamento.
-- [ ] La calibrazione dell'offset del servo ("Off Cal") fa 61 iterazioni con ritardi
-      software (~130 ms a CPI 1) perché il nostro servo non converge mai: su hardware
-      vero probabilmente ne bastano poche (M4, insieme ai seek).
+### Fatto in questa sessione (dettagli nei commit)
+- **Jingle del boot** (lo "zzzzzmmm" del logo che pulsa, confermato dall'utente): DAC FIFO
+  avviato nell'ordine del BIOS, SoftCh = bit 12 di 0x1034, **I2C cloccato a 108 MHz**
+  (col clock di MAME le 10 letture dei pad occupano un frame intero e il BIOS non nutre
+  mai il jingle). `--wav FILE` registra l'audio.
+- **Audio dei canali hardware:** nibble ADPCM **dal più basso** (verificato su campioni di
+  IWL e Ben 10: dall'alto derivano e saturano); **ADPCM36** (ADPCM_SEL bit 15, i colpi di
+  Ben 10, decodifica come MAME, scelta all'orecchio dall'utente); VolSel su tutto il mix.
+- **HVGA (640x240) parte dalla riga 8 dei layer:** split-screen di Ben 10 pulito (riga 0
+  dei tilemap = spazzatura, metà da 120 righe, IRQ di riga a 120). Confermato dall'utente.
+- Strumenti: **Ctrl+F12 / `--debug-dump`** (RAM + stato video) e **`--render-dump`** per
+  rifare un frame offline; `sched_reset()`; `--field-vblank` di nuovo funzionante.
 
 ## Prossima sessione
 
-### 1. Comodità del frontend
-- [x] **Toolbar** disegnata da noi (`src/toolbar.c`, icone 12x12, stile del pannello
-      carte, a scomparsa dopo 2,5 s): disco (dialogo nativo Windows, o file trascinato
-      sulla finestra), carte, togli carta, pausa, reset, FAST/MAME, screenshot, 1x/2x,
-      schermo intero, muto e volume. Tasti: Ctrl+O, F1, F2, P, F5, F3, F12, F11/Alt+Invio.
-      Il reset a runtime ha richiesto `sched_reset()`. **Provata dall'utente** con Marvel
-      Heroes: disco dal dialogo, pausa, carte, volume, screenshot.
-- [x] Cartella `cards` (e `screenshots`) accanto all'eseguibile; `cards/xmen001.bin`
-      spostata in `build/cards/` (attenzione: cancellare `build/` la cancella).
-- [x] Schermo intero (F11, Alt+Invio; Esc ne esce), proporzioni conservate.
-- [ ] Ricordare volume, scala e ultima cartella dei dischi nel file di configurazione
-      (insieme alla scelta del BIOS all'avvio).
-- [ ] Percorsi non ASCII: i file trascinati arrivano in UTF-8, `fopen` vuole la codepage
-      ANSI (oggi "Cannot open"). Il dialogo nativo usa ANSI e funziona.
-- [x] Gamepad (SDL GameController) e secondo giocatore (porta I2C 1): primo pad =
-      giocatore 1, secondo = giocatore 2, collegamento a caldo; colori Xbox = colori
-      HyperScan; la tastiera prende il primo giocatore senza pad (con un pad solo è il
-      giocatore 2; con due torna sull'1, sommata al pad: fonti separate in `input.c`);
-      pannello carte navigabile col pad. **Provato dall'utente:** Marvel Heroes in due
-      (pad Xbox One + tastiera); le carte dei due giocatori si scansionano una alla volta,
-      quindi basta un solo lettore.
-- [ ] Gamepad: aprire il pannello carte dal pad (una combinazione, es. View+LB) e
-      rimappatura dei tasti nel file di configurazione.
-- [ ] Save state (CPU, RAM, device, scheduler; formato versionato).
-- [ ] Avvio senza argomenti: dialogo per scegliere BIOS e disco, ricordati in un file di
-      configurazione.
+### 0. Nome
+- [ ] Scegliere il nome dell'emulatore (proposte nel wrap-up del 2026-10-05: Underscan,
+      Overscan, Swipe, Hyperion…), poi rinominare eseguibile, finestra, README e repo.
 
-### 2. Copertura dei giochi
-- [x] **Ben 10** (USE2) arriva al gameplay (foresta, tutorial delle carte Sumo Slammer)
-      in entrambi i preset, come MAME: fast prima di 200 s, mame verso 240 s. Il boot è
-      fatto di ~2 minuti di caricamenti (seek continui, filmato iniziale in un modo video a
-      60 Hz): da confrontare con un video reale (M4). **Da giocare dall'utente**, carte
-      comprese.
-- [x] Regressione a 6 giochi: aggiunti Ben 10 (120 s) e il dump vero di X-Men USE2
-      (`xm2`, MODE1/2352, 60 s); tutti identici a MAME. Riferimenti registrati a mano (Ben 10
-      dalla sessione di prova, xm2 con lo stesso comando di `record-games.sh`).
-- [ ] Gameplay di Spider-Man, Marvel Heroes, IWL e Ben 10 col preset fast: carte,
-      frame rate a confronto con i video (un gioco VGA interlacciato a 60 fps smentirebbe
-      il modello "CPI 1 + vblank per frame").
-- [ ] Parità con input fra noi e MAME: MAME inietta i tasti via Lua ai confini di frame,
-      `--input` a tempi in secondi; serve un formato comune (frame o ciclo) per estendere
-      la regressione al gameplay.
+### 1. Verso la prima release
+- [ ] File di configurazione accanto all'eseguibile: BIOS, ultima cartella dei dischi,
+      volume, scala, timing; **avvio senza argomenti** con dialogo per il BIOS (al primo
+      avvio) e per il disco.
+- [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
+      THIRD_PARTY_NOTICES; script `tools/package_release.sh`; versione nel binario.
+- [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
+- [ ] `tools/games.sh` punta a percorsi di questa macchina (`D:`, `J:`): renderli relativi o
+      configurabili prima di pubblicare.
+- [ ] Percorsi non ASCII: i file trascinati arrivano in UTF-8, `fopen` vuole ANSI.
 
-### Ben 10, prove dell'utente (2026-10-05 pomeriggio)
-- [x] Gioca in due (pad + tastiera). Riferito: effetti che "grattano", musica bassa,
-      riga glitchata in alto nello split-screen.
-- [x] **ADPCM: i nibble vanno letti dal più basso** (come MAME SPG2xx), non dal più alto
-      come nel fork HS-LBA. Verificato su campioni veri: dal basso gli effetti di Ben 10 e
-      le voci di IWL tornano a 0 e non saturano mai; dall'alto derivano a fondo scala (IWL:
-      fino a 1456 campioni saturi in una voce). HS-LBA non è toccato (mixa in software
-      sulla FIFO); lo è solo il decoder della sua patch MAME (`0002-spg290-spu.patch`).
-- [x] **ADPCM36** (attributo 0x34 = ADPCM_SEL, bit 15): i colpi di Ben 10 (intestazione
-      del campione 0x00D5, contro 0x0055 dell'IMA) sono in questo formato, che il fork non
-      implementava: suonavano come rumore. Un'intestazione ogni 8 parole
-      (`0xBE00 | coef << 4 | shift`, i bit alti ripetono ADPCM_SEL), decodifica come MAME
-      SPG2xx. L'utente ha confrontato all'orecchio 4 decodifiche: vincono MAME e la tabella
-      PSX (il coefficiente conta poco), perde il polo doppio. Il senso esatto di `coef`
-      resta da capire.
-  **Confermato dall'utente in partita** (i pugni di Ben ora suonano giusti).
-- [ ] Canali hardware: i loop (tone mode 2, LoopAddr) non sono implementati (nessun gioco
-      provato li usa finora).
-- [x] VolSel (0x1034 bit 7:6) scala tutto il mix come in MAME SPG2xx, non solo la FIFO:
-      musica ed effetti di Ben 10 tornano bilanciati (prima effetti a x1, musica a x1/2).
-      Livelli: X-Men e Ben 10 RMS -16 dBFS nei momenti forti, picchi -6; **IWL** imposta
-      VolSel 1 e le sue voci escono a picco -18 dBFS: da sentire.
-- [x] **Riga glitchata nello split-screen**: dal dump dell'utente, nessun trucco a metà
-      frame (le due metà stanno negli stessi tilemap, 3 layer); la riga 0 dei tilemap è
-      spazzatura e la disposizione (due metà da 120 righe, IRQ di riga a 120) parte dalla
-      riga 8. In HVGA (640x240) lo schermo ora mostra le righe 8-247 dei layer (le uniche
-      altre schermate HVGA, di Spider-Man, sono nere). Nessun video reale per confermare.
-- [ ] IRQ di riga del PPU (irq_control bit 2, irq_timing_v/h) non emulato, nemmeno da
-      MAME: Ben 10 lo abilita a riga 120 in due giocatori; il suo gestore passa dal BIOS.
-- [x] Strumento: Ctrl+F12 / `--debug-dump DIR` salvano RAM e stato video, `--render-dump
-      DIR` ri-renderizza il frame (verificato identico al pixel).
-
-### Idee per il frontend (in coda)
-- [ ] Modo "passa la carta" nel pannello (es. Maiusc+Invio): la carta resta sul lettore
-      ~2 s e poi si toglie da sola, come un passaggio; Invio resta "appoggiata" (in due
-      giocatori oggi serve F2 fra una carta e l'altra, vedi README).
+### 2. Frontend
 - [ ] Filtro TV: l'HyperScan esce solo in composito, che fonde il dithering dei giochi
       (RGB565 a trame alternate). Spento / composito (YIQ, luminanza ~3 px, crominanza molto
       più larga) / CRT (composito + scanline). Screenshot e dump restano senza filtro.
+- [ ] Modo "passa la carta" (es. Maiusc+Invio): la carta resta ~2 s e si toglie da sola;
+      oggi in due giocatori serve F2 fra una carta e l'altra (vedi README).
+- [ ] Gamepad: aprire il pannello carte dal pad (es. View+LB), rimappatura dei tasti.
+- [ ] Save state (CPU, RAM, device, scheduler; formato versionato). Il dump di debug ha
+      già lo stato video.
 
-### 3. Distribuzione
-- [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
-      THIRD_PARTY_NOTICES, licenze; script `tools/package_release.sh`; versione nel binario.
-- [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
-- [ ] Le opzioni di default di `tools/games.sh` puntano a percorsi di questa macchina:
-      renderle relative a `discs/` prima di pubblicare.
+### 3. Fedeltà, da verificare
+- [ ] **IWL:** le voci escono a picco -18 dBFS (il gioco imposta VolSel 1): ascoltarle.
+- [ ] **X-Men, menu:** col nuovo I2C i pad sono letti 30 volte al secondo invece di 15; se
+      i menu seguono il polling potrebbero animarsi al doppio. Confronto coi video.
+- [ ] Gameplay di Spider-Man e IWL col preset fast: carte, frame rate a confronto con i video.
+- [ ] IRQ di riga del PPU (irq_control bit 2, irq_timing_v/h) non emulato, nemmeno da MAME;
+      Ben 10 lo abilita a riga 120 in due giocatori (gestore via BIOS), senza effetti visibili.
+- [ ] Canali hardware: loop (tone mode 2, LoopAddr) non implementati; senso esatto del
+      coefficiente ADPCM36.
+- [ ] Parità con input fra noi e MAME (formato comune a frame o cicli) per estendere la
+      regressione al gameplay.
 
 ### 4. M4: timing reale
-- [ ] Tempo di seek del CD (MAME: istantaneo; misurato 100-200 ms sull'hardware) e durata
-      dei caricamenti di X-Men a confronto con un video cronometrato.
-- [ ] Il log UART del BIOS (`--log-uart`) descrive i seek (`SEEK mode`, `NowQ=`): utile
-      per il modello.
+- [ ] Seek del CD (MAME istantaneo; 100-200 ms sull'hardware) e durata dei caricamenti a
+      confronto con video cronometrati (X-Men; Ben 10 ha ~2 minuti di caricamenti al boot).
+- [ ] Calibrazione dell'offset del servo ("Off Cal"): 61 iterazioni con ritardi software
+      perché il nostro servo non converge; su hardware vero probabilmente poche.
+- [ ] Il log UART del BIOS (`--log-uart`) descrive i seek (`SEEK mode`, `NowQ=`).
 - [ ] Boot reale: >1 minuto dal logo HyperScan ai loghi Marvel su console vera.
 
 ### 5. Verso M5 (boot senza BIOS)
-- [ ] Spider-Man legge i file senza le voci open/read/close della tabella BIOS: capire
-      come dalle tracce.
+- [ ] Spider-Man legge i file senza le voci open/read/close della tabella BIOS: capire come.
 - [ ] Catalogo dei 29 servizi BIOS (nomi, argomenti, risultati) dalle tracce LLE.
 
 ### Note
-- `dumps/` occupa circa 14 GB (riferimenti completi a 72 M e 180 M istruzioni, tracce
-  sparse): i riferimenti servono alla regressione, il resto si può cancellare.
-- Dal tool Bash: `\n` dentro heredoc e one-liner Python arriva come a capo vero; le
-  stringhe C con `\n` vanno modificate con l'editor.
+- `dumps/` occupa circa 15 GB: servono i riferimenti di `dumps/ref/` e
+  `dumps/sparse/ref-*.trace`; il resto (`ours-*`, tracce complete vecchie) si può cancellare.
+- Il Wolverine dell'utente (10 punti esperienza) è in `build/cards/xmen001.bin`: cancellare
+  `build/` lo cancella.
+- Dal tool Bash: `\n` e `\\` dentro heredoc e script Python arrivano trasformati; le
+  stringhe C con escape vanno scritte con l'editor (o con `fputc(10, f)`). Con
+  `/c/msys64/mingw64/bin` nel PATH parte il python di mingw senza Pillow: usare
+  `/c/Python314/python.exe`.
+- Il codice del BIOS in RAM si disassembla con `D:/Homebrew4/Pippin/mame/unidasm.exe
+  -arch score7` (gp del BIOS = 0xA0045140); BIOS in `J:/Users/utente/Downloads/roms/hyprscan/`.
 - Fork MAME: branch locale `recon` (HS_TRACE completo e sparso, profiling); per HS-LBA
-  tornare a `hs-lba-0287`.
+  tornare a `hs-lba-0287`. La sua patch SPU (`HS-LBA/mame/0002-spg290-spu.patch`) ha ancora
+  i nibble ADPCM dall'alto e non ha ADPCM36.
