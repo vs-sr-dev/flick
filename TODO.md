@@ -98,6 +98,15 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       le voci di IWL tornano a 0 e non saturano mai; dall'alto derivano a fondo scala (IWL:
       fino a 1456 campioni saturi in una voce). HS-LBA non è toccato (mixa in software
       sulla FIFO); lo è solo il decoder della sua patch MAME (`0002-spg290-spu.patch`).
+- [x] **ADPCM36** (attributo 0x34 = ADPCM_SEL, bit 15): i colpi di Ben 10 (intestazione
+      del campione 0x00D5, contro 0x0055 dell'IMA) sono in questo formato, che il fork non
+      implementava: suonavano come rumore. Un'intestazione ogni 8 parole
+      (`0xBE00 | coef << 4 | shift`, i bit alti ripetono ADPCM_SEL), decodifica come MAME
+      SPG2xx. L'utente ha confrontato all'orecchio 4 decodifiche: vincono MAME e la tabella
+      PSX (il coefficiente conta poco), perde il polo doppio. Il senso esatto di `coef`
+      resta da capire.
+- [ ] Canali hardware: i loop (tone mode 2, LoopAddr) non sono implementati (nessun gioco
+      provato li usa finora).
 - [x] VolSel (0x1034 bit 7:6) scala tutto il mix come in MAME SPG2xx, non solo la FIFO:
       musica ed effetti di Ben 10 tornano bilanciati (prima effetti a x1, musica a x1/2).
       Livelli: X-Men e Ben 10 RMS -16 dBFS nei momenti forti, picchi -6; **IWL** imposta

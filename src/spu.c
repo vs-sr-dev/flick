@@ -9,8 +9,8 @@
  *  2. DAC FIFO DMA: a double-buffered FIFO in RAM (P_DAC_FIFOBA 0x1080, rate
  *     27 MHz / (P_DAC_SAMPLE_CLK + 1), P_DAC_INT_STATUS 0x1088: [1:0] size, [2] stereo,
  *     [14] enable, [15] IRQ). An IRQ (FIQ, vector 63) at each half-buffer. Retail games.
- * Hardware channels 0-23: 4-bit IMA ADPCM / 8- or 16-bit PCM with end codes; an ended
- * channel raises the FIQ.
+ * Hardware channels 0-23: 4-bit IMA ADPCM, ADPCM36 or 8-/16-bit PCM with end codes; an
+ * ended channel raises the FIQ. Loops (tone mode 2) are not implemented yet.
  *
  * The BIOS plays its boot jingle through the FIFO too, but sets it up the other way round:
  * enable (0x1088 = 0x4007) first, then the base address and the sample clock, and its
@@ -85,6 +85,9 @@ typedef struct {
 	int16_t last_sample;
 	uint32_t sample_count, started_waddr;
 	ima_state adpcm;
+	uint16_t adpcm_sel;                  // attribute 0x34: [15] ADPCM36
+	uint16_t a36_header, a36_remaining;  // ADPCM36: block header, data words left in the block
+	int16_t a36_prev;
 } spu_channel;
 
 static emu_timer *s_dma_timer, *s_tick;
@@ -122,7 +125,38 @@ static int fetch_next_sample(int ch)
 	const int adpcm = (c->mode >> 15) & 1;
 	const int m16 = (c->mode >> 14) & 1;
 
-	if (adpcm)
+	if (adpcm && (c->adpcm_sel & 0x8000))
+	{
+		// ADPCM36 (MAME's SPG2xx): a header word before every 8 data words, [3:0] shift,
+		// [9:4] a 6-bit signed first-order coefficient; nibbles low first, end code 0xFFFF.
+		// Ben 10's hit effects. MAME's coefficient scale is a guess, but the coefficient
+		// barely matters: these sounds are mostly the shifted nibbles
+		if (c->sample_shift == 0 && c->a36_remaining == 0)
+		{
+			c->a36_header = c->cur_word;
+			c->a36_remaining = 8;
+			c->cur_waddr++;
+			c->cur_word = read_word(c->cur_waddr * 2);
+		}
+		if (c->sample_shift == 0 && c->cur_word == 0xffff)
+			return 0;
+		const int shift = c->a36_header & 0xf;
+		const int filter = (c->a36_header >> 4) & 0x3f;
+		const int f0 = (filter & 0x20) ? filter - 0x40 : filter;
+		int16_t sdata = (int16_t)(uint16_t)(((c->cur_word >> c->sample_shift) & 0x0f) << 12);
+		sdata = (int16_t)((sdata >> shift) + ((c->a36_prev * f0 + 32) >> 12));
+		c->a36_prev = sdata;
+		c->last_sample = sdata;
+		c->sample_shift += 4;
+		if (c->sample_shift >= 16)
+		{
+			c->sample_shift = 0;
+			c->a36_remaining--;
+			c->cur_waddr++;
+			c->cur_word = read_word(c->cur_waddr * 2);
+		}
+	}
+	else if (adpcm)
 	{
 		// 4-bit IMA ADPCM, 4 nibbles per word low nibble first (as MAME's SPG2xx), end code
 		// 0xFFFF. The fork read the high nibble first, which only its own encoder matched:
@@ -182,6 +216,8 @@ static void start_channel(int ch)
 		c->sample_shift = 0;
 		c->cur_word = read_word(c->cur_waddr * 2);
 		c->adpcm.signal = c->adpcm.step = 0;
+		c->a36_header = c->a36_remaining = 0;
+		c->a36_prev = 0;
 		c->last_sample = 0;
 		c->sample_count = 0;
 		c->started_waddr = c->waddr;
@@ -520,7 +556,8 @@ void spu_write(uint32_t off, uint32_t data, uint32_t mask)
 			case 0x08: c->loop_addr = (c->loop_addr & 0x3f0000) | (data & 0xffff); break;      // LoopAddr_lo
 			case 0x0c: c->ch_volume = data & 0x7f; c->pan = (data >> 8) & 0x7f; break;        // Pan, ChVolume
 			case 0x14: c->edd = data & 0x7f; break;                                             // EnvData
-			case 0x2c: c->wdd = (uint16_t)data; break;                                          // WDD
+			case 0x2c: c->wdd = (uint16_t)data; break;
+			case 0x34: c->adpcm_sel = (uint16_t)data; break;                                   // ADPCM_SEL                                          // WDD
 			}
 		}
 		else if (off >= 0x0800 && off < 0x0e00)        // phase SRAM
