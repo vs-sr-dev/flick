@@ -17,6 +17,7 @@
 #include "ui.h"
 #include "toolbar.h"
 #include "os.h"
+#include "dump.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -268,6 +269,23 @@ static void screenshot(void)
 	ui_toast(m);
 }
 
+/* Ctrl+F12: debug/hyperscan-YYYYMMDD-HHMMSS/ next to the executable, for --render-dump */
+static void dump_now(void)
+{
+	char dir[1024], path[1200], m[1300];
+	os_exe_dir(dir, sizeof(dir));
+	snprintf(path, sizeof(path), "%s/debug", dir);
+	os_mkdir(path);
+	const time_t t = time(NULL);
+	char stamp[32];
+	strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", localtime(&t));
+	snprintf(path, sizeof(path), "%s/debug/hyperscan-%s", dir, stamp);
+	os_mkdir(path);
+	if (debug_dump(path)) snprintf(m, sizeof(m), "Debug dump: debug/hyperscan-%s", stamp);
+	else snprintf(m, sizeof(m), "Cannot write %s", path);
+	ui_toast(m);
+}
+
 static void release_pad(void)
 {
 	input_release_all();
@@ -459,6 +477,7 @@ static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDevi
 		else if (sym == SDLK_F2) cmd = TB_CARD_OFF;
 		else if (sym == SDLK_F3) cmd = TB_TIMING;
 		else if (sym == SDLK_F5) cmd = TB_RESET;
+		else if (sym == SDLK_F12 && ctrl) { dump_now(); return; }
 		else if (sym == SDLK_F12) cmd = TB_SHOT;
 		else if (sym == SDLK_PAUSE || (sym == SDLK_p && !ui_panel_open())) cmd = TB_PAUSE;
 		if (cmd != TB_NONE)
@@ -695,7 +714,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 
 int main(int argc, char **argv)
 {
-	const char *bios = NULL, *shot = NULL, *wav = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
+	const char *bios = NULL, *shot = NULL, *wav = NULL, *render_dump = NULL, *dump_dir = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
 	int headless = 0, cpi = 0, io_cycles = 0, fast = 1, field_vblank = 0;
 	double seconds = 0;
 	uint64_t frames = 0;
@@ -723,6 +742,8 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--frames")) frames = strtoull(NEXT(), NULL, 0);
 		else if (!strcmp(a, "--screenshot")) shot = NEXT();
 		else if (!strcmp(a, "--wav")) wav = NEXT();
+		else if (!strcmp(a, "--render-dump")) render_dump = NEXT();
+		else if (!strcmp(a, "--debug-dump")) dump_dir = NEXT();
 		else if (!strcmp(a, "--trace")) trace = NEXT();
 		else if (!strcmp(a, "--cpi")) cpi = atoi(NEXT());
 		else if (!strcmp(a, "--timing"))
@@ -746,6 +767,20 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--log-uart")) g_log_uart = 1;
 		else if (!strcmp(a, "-v")) g_verbose = 1;
 		else usage();
+	}
+	if (render_dump)                        /* re-render a Ctrl+F12 dump, no BIOS needed */
+	{
+		char out[1200];
+		machine_reset(NULL);
+		if (!debug_render(render_dump))
+		{
+			fprintf(stderr, "cannot read the dump in %s\n", render_dump);
+			return 1;
+		}
+		snprintf(out, sizeof(out), "%s/render.png", render_dump);
+		if (!png_write(shot ? shot : out, &g_frame[0][0], 640, screen_width(), screen_height()))
+			fprintf(stderr, "cannot write %s\n", shot ? shot : out);
+		return 0;
 	}
 	if (!bios || cpi < 0) usage();
 
@@ -817,6 +852,11 @@ int main(int argc, char **argv)
 	if (shot && !png_write(shot, &g_frame[0][0], 640, screen_width(), screen_height()))
 		fprintf(stderr, "cannot write %s\n", shot);
 	if (g_trace) fclose(g_trace);
+	if (dump_dir)
+	{
+		os_mkdir(dump_dir);
+		if (!debug_dump(dump_dir)) fprintf(stderr, "cannot write the dump in %s\n", dump_dir);
+	}
 	if (s_wav)
 	{
 		wav_header();

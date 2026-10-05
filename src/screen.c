@@ -4,6 +4,7 @@
  * The timing follows MAME's screen_device (configure, vblank begin/end timers, vpos)
  * because the PPU vblank IRQ has to land on the same instruction as in MAME; the TV
  * registers and the frame composition (TVE frame buffer, fade) follow the spg29x driver. */
+#include <stdio.h>
 #include <string.h>
 #include "devices.h"
 #include "sched.h"
@@ -62,7 +63,27 @@ int screen_vpos(void)
 int screen_width(void)  { return s_vis_w; }
 int screen_height(void) { return s_vis_h; }
 
-static void compose_frame(void)
+/* what the frame composition needs, for debug dumps (fixed layout, same build) */
+#define SCREEN_STATE(X) X(s_vis_w) X(s_vis_h) X(s_tve_control) X(s_tve_fade_offset) \
+	X(s_tve_buffer_ctrl) X(s_tv_start_addr)
+
+void screen_dump(FILE *f)
+{
+#define W(v) fwrite(&v, sizeof(v), 1, f);
+	SCREEN_STATE(W)
+#undef W
+}
+
+int screen_undump(FILE *f)
+{
+	int ok = 1;
+#define R(v) ok &= fread(&v, sizeof(v), 1, f) == 1;
+	SCREEN_STATE(R)
+#undef R
+	return ok;
+}
+
+void screen_compose(void)
 {
 	ppu_render(g_frame, s_vis_w, s_vis_h);
 
@@ -117,7 +138,7 @@ static void vblank_begin(void *ctx, int param)
 	s_vblank_start_time = sched_time();
 	s_vblank_end_time = s_vblank_start_time + s_vblank_period;
 
-	compose_frame();                        /* MAME's frame_update, before the callbacks */
+	screen_compose();                        /* MAME's frame_update, before the callbacks */
 	if (g_on_frame) g_on_frame();
 
 	ppu_screen_vblank(1);

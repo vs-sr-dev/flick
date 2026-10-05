@@ -3,6 +3,7 @@
 /* SPG290 PPU - port of MAME's spg290_ppu.cpp, kept pixel-identical to it
  * (e.g. the bitmap blit never reaches the last visible row, blend results wrap to 8 bits).
  * TODO (as MAME): horizontal/vertical compression, character flip. */
+#include <stdio.h>
 #include <string.h>
 #include "devices.h"
 #include "score7.h"
@@ -39,6 +40,29 @@ void ppu_init(void)
 	memset(m_hoffset_ram, 0, sizeof(m_hoffset_ram));
 	memset(m_voffset_ram, 0, sizeof(m_voffset_ram));
 	memset(m_sprite_ram, 0, sizeof(m_sprite_ram));
+}
+
+/* the PPU's registers and memories, for debug dumps (fixed layout, same build) */
+#define PPU_STATE(X) X(m_control) X(m_sprite_control) X(m_irq_control) X(m_irq_status) \
+	X(m_sprite_max) X(m_sprite_buf_start) X(m_blend_mode) X(m_frame_buff) X(m_transrgb) \
+	X(m_vcomp_value) X(m_vcomp_offset) X(m_vcomp_step) X(m_irq_timing_v) X(m_irq_timing_h) \
+	X(m_vblank_lines) X(m_txs) X(m_char_palette_ram) X(m_sprite_palette_ram) X(m_hoffset_ram) \
+	X(m_voffset_ram) X(m_sprite_ram)
+
+void ppu_dump(FILE *f)
+{
+#define W(v) fwrite(&v, sizeof(v), 1, f);
+	PPU_STATE(W)
+#undef W
+}
+
+int ppu_undump(FILE *f)
+{
+	int ok = 1;
+#define R(v) ok &= fread(&v, sizeof(v), 1, f) == 1;
+	PPU_STATE(R)
+#undef R
+	return ok;
 }
 
 static uint32_t *ram_slot(uint32_t off)

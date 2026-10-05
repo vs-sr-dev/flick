@@ -124,10 +124,13 @@ static int fetch_next_sample(int ch)
 
 	if (adpcm)
 	{
-		// 4-bit IMA ADPCM, 4 nibbles per word MSB-first, end code 0xFFFF
+		// 4-bit IMA ADPCM, 4 nibbles per word low nibble first (as MAME's SPG2xx), end code
+		// 0xFFFF. The fork read the high nibble first, which only its own encoder matched:
+		// retail samples (IWL voices, Ben 10 effects) then drift to full scale and clip,
+		// while low first they decay back to 0
 		if (c->sample_shift == 0 && c->cur_word == 0xffff)
 			return 0;
-		const int shift = 12 - c->sample_shift;
+		const int shift = c->sample_shift;
 		const uint8_t nibble = (c->cur_word >> shift) & 0x0f;
 		c->last_sample = ima_clock(&c->adpcm, nibble);
 		c->sample_shift += 4;
@@ -197,14 +200,11 @@ static void stream_render(uint32_t n)
 	const float master = (float)(m_main_vol & 0x7f) / 127.0f;
 	const uint32_t softch = g_spu_bios_dac ? 0x1000 : 0x0200;
 	const int fifo_dac_on = (m_ctrl_flags & softch) && (m_soft_ctrl & 0x4000) && m_dac_rate;
-	uint32_t fifo_step = 0;
-	float fifo_vol = 0.0f;
-	if (fifo_dac_on)
-	{
-		static const float volsel[4] = { 1.0f / 32, 1.0f / 8, 1.0f / 2, 1.0f };
-		fifo_step = (uint32_t)(((uint64_t)m_dac_rate << 16) / OUT_RATE);
-		fifo_vol = volsel[(m_ctrl_flags >> 6) & 3];
-	}
+	/* VolSel scales the whole mix, voices and FIFO alike (MAME's SPG2xx: 1/16, 1/4, 1, 2;
+	 * halved here for headroom, as the fork did for the FIFO alone) */
+	static const float volsel[4] = { 1.0f / 32, 1.0f / 8, 1.0f / 2, 1.0f };
+	const float vol = volsel[(m_ctrl_flags >> 6) & 3];
+	const uint32_t fifo_step = fifo_dac_on ? (uint32_t)(((uint64_t)m_dac_rate << 16) / OUT_RATE) : 0;
 
 	for (uint32_t i = 0; i < n; i++)
 	{
@@ -217,8 +217,8 @@ static void stream_render(uint32_t n)
 			if (pos >= m_ring_head)
 				pos = m_ring_head ? m_ring_head - 1 : 0;
 			const uint32_t slot = (pos % RING_SIZE) * 2;
-			dac_l = (int32_t)(m_ring[slot + 0] * fifo_vol);
-			dac_r = (int32_t)(m_ring[slot + 1] * fifo_vol);
+			dac_l = m_ring[slot + 0];
+			dac_r = m_ring[slot + 1];
 			m_ring_frac += fifo_step;
 		}
 		else
@@ -262,8 +262,8 @@ static void stream_render(uint32_t n)
 		if (g_spu_output_enabled && s_out_head - s_out_tail < OUT_SIZE)
 		{
 			const uint32_t slot = (s_out_head % OUT_SIZE) * 2;
-			s_out[slot + 0] = clip16((int32_t)(mix_l * master) + dac_l);
-			s_out[slot + 1] = clip16((int32_t)(mix_r * master) + dac_r);
+			s_out[slot + 0] = clip16((int32_t)((mix_l * master + dac_l) * vol));
+			s_out[slot + 1] = clip16((int32_t)((mix_r * master + dac_r) * vol));
 			s_out_head++;
 		}
 	}

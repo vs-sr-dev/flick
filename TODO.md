@@ -90,6 +90,27 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       `--input` a tempi in secondi; serve un formato comune (frame o ciclo) per estendere
       la regressione al gameplay.
 
+### Ben 10, prove dell'utente (2026-10-05 pomeriggio)
+- [x] Gioca in due (pad + tastiera). Riferito: effetti che "grattano", musica bassa,
+      riga glitchata in alto nello split-screen.
+- [x] **ADPCM: i nibble vanno letti dal più basso** (come MAME SPG2xx), non dal più alto
+      come nel fork HS-LBA. Verificato su campioni veri: dal basso gli effetti di Ben 10 e
+      le voci di IWL tornano a 0 e non saturano mai; dall'alto derivano a fondo scala (IWL:
+      fino a 1456 campioni saturi in una voce). **Attenzione HS-LBA:** il suo encoder
+      ADPCM, se usa i canali hardware, scrive i nibble dall'alto: su console vera
+      suonerebbe come qui prima della correzione.
+- [x] VolSel (0x1034 bit 7:6) scala tutto il mix come in MAME SPG2xx, non solo la FIFO:
+      musica ed effetti di Ben 10 tornano bilanciati (prima effetti a x1, musica a x1/2).
+      Livelli: X-Men e Ben 10 RMS -16 dBFS nei momenti forti, picchi -6; **IWL** imposta
+      VolSel 1 e le sue voci escono a picco -18 dBFS: da sentire.
+- [ ] **Riga glitchata nello split-screen** (righe 0-7 con pezzi di sfondo, modo
+      640x240): serve un dump Ctrl+F12 dall'utente in modalità due giocatori, poi
+      `--render-dump` per correggere il renderer offline. Sospetti: compressione verticale
+      (`vcomp_*`), tabelle hoffset/voffset, wrap verticale dei layer a caratteri; il
+      renderer di MAME non implementa le prime due.
+- [x] Strumento: Ctrl+F12 / `--debug-dump DIR` salvano RAM e stato video, `--render-dump
+      DIR` ri-renderizza il frame (verificato identico al pixel).
+
 ### 3. Distribuzione
 - [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
       THIRD_PARTY_NOTICES, licenze; script `tools/package_release.sh`; versione nel binario.

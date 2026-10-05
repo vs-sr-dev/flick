@@ -47,6 +47,8 @@ independent project, not affiliated with Mattel or Sunplus.
 | `--seconds S`, `--frames N` | stop after S emulated seconds / N frames |
 | `--screenshot FILE` | save the last frame as PNG on exit |
 | `--wav FILE` | record the sound output as a WAV file (window or headless) |
+| `--debug-dump DIR` | on exit, save the frame's video state and RAM (as Ctrl+F12 does in the window) |
+| `--render-dump DIR` | render such a dump again into `DIR/render.png` (or `--screenshot FILE`); no BIOS needed |
 | `--trace FILE[:N[:K[:FROM]]]` | trace the first N instructions (default 50M), same format as the MAME fork; with K > 0 a sparse trace (I/O, interrupts, a register hash every K instructions, full lines from FROM on) |
 | `--input SPEC` | scripted presses, `T:button[:dur][@pad],...` with times in seconds |
 | `--timing fast\|mame` | timing model (default `fast`, see below); `--trace` forces `mame` |
@@ -76,6 +78,7 @@ seconds. Its buttons, with their keys:
 | reset | F5 | restart the console (the disc and the card stay) |
 | FAST / MAME | F3 | switch the timing preset (see below) |
 | camera | F12 | save a screenshot in `screenshots/` next to the executable |
+| | Ctrl+F12 | debug dump in `debug/` next to the executable: RAM, PPU and TV state, frame (for reporting graphics glitches) |
 | 1x / 2x | | window size |
 | full screen | F11, Alt+Enter | full screen and back (Esc also leaves it) |
 | speaker, slider | | mute, volume (the mouse wheel works on them too) |

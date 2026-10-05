@@ -5,6 +5,7 @@
 #ifndef HS_DEVICES_H
 #define HS_DEVICES_H
 
+#include <stdio.h>
 #include "emu.h"
 
 #define COMBINE(var, data, mask)  ((var) = ((var) & ~(mask)) | ((data) & (mask)))
@@ -43,6 +44,9 @@ extern uint64_t g_frame_count;
 extern int g_i2c_sysclk;             /* I2C from the 108 MHz system clock (MAME: 27 MHz) */
 extern int g_field_vblank;           /* timing experiment: PPU vblank per field (interlaced) */
 extern void (*g_on_frame)(void);     /* frontend hook, called at each vblank start */
+void screen_compose(void);           /* render the PPU and the TV encoder into g_frame */
+void screen_dump(FILE *f);           /* debug dumps: the state screen_compose() needs */
+int screen_undump(FILE *f);
 
 /* ppu.c */
 void ppu_init(void);
@@ -50,5 +54,7 @@ uint32_t ppu_read(uint32_t off);
 void ppu_write(uint32_t off, uint32_t data, uint32_t mask);
 void ppu_screen_vblank(int state);
 void ppu_render(uint32_t (*bitmap)[640], int vis_w, int vis_h);
+void ppu_dump(FILE *f);              /* debug dumps: registers and memories */
+int ppu_undump(FILE *f);
 
 #endif
