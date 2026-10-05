@@ -52,7 +52,8 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       carte, a scomparsa dopo 2,5 s): disco (dialogo nativo Windows, o file trascinato
       sulla finestra), carte, togli carta, pausa, reset, FAST/MAME, screenshot, 1x/2x,
       schermo intero, muto e volume. Tasti: Ctrl+O, F1, F2, P, F5, F3, F12, F11/Alt+Invio.
-      Il reset a runtime ha richiesto `sched_reset()`. **Da provare dall'utente.**
+      Il reset a runtime ha richiesto `sched_reset()`. **Provata dall'utente** con Marvel
+      Heroes: disco dal dialogo, pausa, carte, volume, screenshot.
 - [x] Cartella `cards` (e `screenshots`) accanto all'eseguibile; `cards/xmen001.bin`
       spostata in `build/cards/` (attenzione: cancellare `build/` la cancella).
 - [x] Schermo intero (F11, Alt+Invio; Esc ne esce), proporzioni conservate.
