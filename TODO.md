@@ -54,10 +54,14 @@ Contesto: [RECON.md](RECON.md) (ricognizione del 2026-10-04). **M1 completato**;
 - [ ] Catalogo dei 29 servizi BIOS con nomi e firme dalle tracce (serve a M5).
 - [x] Prestazioni: timer analitici (un evento per overflow invece che per tick, traccia
       identica), skip esatto dei loop d'attesa. X-Men in combattimento a CPI 1: 150%.
-- [x] Preset `--timing fast` (predefinito): CPI 1, vblank per semiquadro, decoder della carta
-      per rapporti (il BIOS tara i suoi loop al boot: le larghezze assolute dipendono dal
-      CPI, i rapporti no). X-Men 60 fps. F3 alterna con `mame`. Da verificare sui video
-      reali: è M4.
+- [x] Preset `--timing fast` (predefinito): CPI 1, vblank per frame come MAME, decoder
+      della carta per rapporti (il BIOS tara i suoi loop al boot: le larghezze assolute
+      dipendono dal CPI, i rapporti no), skip dei loop d'attesa. F3 alterna con `mame`.
+- [x] **Dato reale (2026-10-05, confronto con i video):** X-Men combatte a **30 fps**. Due
+      modelli compatibili: A) CPI ~1 + vblank per frame (scelto, predefinito); B) vblank
+      per semiquadro + CPI 2-3,7. Discriminanti per M4: un gioco VGA interlacciato a 60 fps
+      nei video smentirebbe A; la durata dei caricamenti (CPU-bound) separa A da B, ma
+      serve anche il modello dei seek.
 - [x] Audio: il frontend usa la coda audio come orologio (60 ms), niente più scatti attesi.
 
 ## Più avanti (da RECON.md)

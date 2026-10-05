@@ -67,8 +67,8 @@ static void usage(void)
 		"  --input SPEC       scripted presses \"T:button[:dur][@pad],...\" (seconds);\n"
 		"                     buttons: green red yellow blue start select lshoulder\n"
 		"                     rshoulder ltrigger rtrigger up down left right\n"
-		"  --timing fast|mame fast (default): CPI 1, a vblank per field, idle loops\n"
-		"                     skipped; mame: as MAME (CPI 6), forced by --trace. F3 toggles\n"
+		"  --timing fast|mame fast (default): CPI 1, idle loops skipped; mame: as\n"
+		"                     MAME (CPI 6), forced by --trace. F3 toggles\n"
 		"  --cpi-at T:N       switch to N cycles per instruction at T seconds\n"
 		"  --io-cycles N      extra cycles per I/O access (default 0, as MAME)\n"
 		"  --field-vblank     PPU vblank per field in interlaced modes (MAME: per frame)\n"
@@ -79,12 +79,14 @@ static void usage(void)
 }
 
 /* timing presets: "mame" reproduces MAME (flat CPI 6, a PPU vblank per frame);
- * "fast" = CPI 1, a vblank per field, card pulses decoded by ratio (MAME's thresholds are
- * tuned to CPI 6), idle loops skipped. Fitting the real console is M4. */
+ * "fast" = CPI 1, card pulses decoded by ratio (MAME's thresholds are tuned to CPI 6), idle
+ * loops skipped; the PPU vblank stays per frame in interlaced modes, as in MAME. That gives
+ * X-Men fights at 30 fps, the rate of captures from real consoles (2026-10-05); with a
+ * vblank per field (--field-vblank) they would reach 60. */
 static void set_timing(int fast)
 {
 	g_cpu.cpi = fast ? 1 : 6;
-	g_field_vblank = fast;
+	g_field_vblank = 0;
 	g_card_scaled = fast;
 	g_cpu.idle_skip = fast;
 }
@@ -199,7 +201,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames)
 			{
 				const int fast = g_cpu.cpi == 6;
 				set_timing(fast);
-				ui_toast(fast ? "Timing: fast (CPI 1, field vblank)" : "Timing: MAME (CPI 6, frame vblank)");
+				ui_toast(fast ? "Timing: fast (CPI 1)" : "Timing: MAME (CPI 6, frame vblank)");
 			}
 			else if (ui_panel_open())
 			{

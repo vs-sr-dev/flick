@@ -57,25 +57,15 @@ Esc = quit.
 
 ### Timing
 
-MAME charges 6 cycles to every instruction and gives one PPU vblank per frame in the
-interlaced video modes, so X-Men fights at 15 fps. The default `fast` preset charges 1
-cycle per instruction and raises a vblank per field: X-Men fights at 60 fps. It also
+MAME charges 6 cycles to every instruction, so X-Men fights at 15 fps. The default `fast`
+preset charges 1 cycle per instruction and keeps MAME's PPU vblank per frame in the
+interlaced video modes: X-Men fights at 30 fps, as on captures from real consoles. It also
 decodes the card reader's pulses by their ratios rather than MAME's absolute widths, which
 only work at 6 cycles per instruction, and fast-forwards idle loops (exactly: whole
 iterations, never past the next event). `--timing mame` (or F3 in the window) gives
-MAME's behaviour back, cycle for cycle. Fitting the timing to the real console is
-milestone M4.
-
-### Character cards
-
-Press **F1** for the card panel. It lists every card of the game in the drive (all 445
-known cards of the five games: names, numbers and kinds such as Character, Attack Mod or
-Finishing Move); type to search, Tab to switch game, Enter to place the card on the reader.
-**F2** takes the card off. The game keeps running with the card on the reader, so you can
-scan it whenever the game asks. No card files are needed: every card is rebuilt from its
-game and number, as MAME's list does. When a game writes to a card (progress, unlocks),
-the card is saved to `cards/<id>.bin` (`--cards-dir` to move it) and that save is used the
-next time you place the same card.
+MAME's behaviour back, cycle for cycle. `--field-vblank` raises a vblank per field instead,
+which lets X-Men reach 60 fps: real captures say it does not. Fitting the rest of the
+timing (loading times, CD seeks) to the real console is milestone M4.
 
 ## Build (Windows, MSYS2 mingw64)
 
