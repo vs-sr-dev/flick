@@ -110,6 +110,14 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [x] Strumento: Ctrl+F12 / `--debug-dump DIR` salvano RAM e stato video, `--render-dump
       DIR` ri-renderizza il frame (verificato identico al pixel).
 
+### Idee per il frontend (in coda)
+- [ ] Modo "passa la carta" nel pannello (es. Maiusc+Invio): la carta resta sul lettore
+      ~2 s e poi si toglie da sola, come un passaggio; Invio resta "appoggiata" (in due
+      giocatori oggi serve F2 fra una carta e l'altra, vedi README).
+- [ ] Filtro TV: l'HyperScan esce solo in composito, che fonde il dithering dei giochi
+      (RGB565 a trame alternate). Spento / composito (YIQ, luminanza ~3 px, crominanza molto
+      più larga) / CRT (composito + scanline). Screenshot e dump restano senza filtro.
+
 ### 3. Distribuzione
 - [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
       THIRD_PARTY_NOTICES, licenze; script `tools/package_release.sh`; versione nel binario.
