@@ -75,10 +75,14 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       configurazione.
 
 ### 2. Copertura dei giochi
-- [ ] **Ben 10** (`J:\Users\utente\Downloads\roms\Ben 10 (USA) (USE2).cue`, volume
-      `BT_V1_0_USE2`, quinto gioco, mai provato) e il dump vero di **X-Men USE2**
-      (`X-Men (USA) (USE2).cue`): aggiungerli a `tools/games.sh`, registrare i riferimenti
-      con `tools/mame/record-games.sh`, provarli col preset fast.
+- [x] **Ben 10** (USE2) arriva al gameplay (foresta, tutorial delle carte Sumo Slammer)
+      in entrambi i preset, come MAME: fast prima di 200 s, mame verso 240 s. Il boot è
+      fatto di ~2 minuti di caricamenti (seek continui, filmato iniziale in un modo video a
+      60 Hz): da confrontare con un video reale (M4). **Da giocare dall'utente**, carte
+      comprese.
+- [x] Regressione a 6 giochi: aggiunti Ben 10 (120 s) e il dump vero di X-Men USE2
+      (`xm2`, MODE1/2352, 60 s); tutti identici a MAME. Riferimenti registrati a mano (Ben 10
+      dalla sessione di prova, xm2 con lo stesso comando di `record-games.sh`).
 - [ ] Gameplay di Spider-Man, Marvel Heroes, IWL e Ben 10 col preset fast: carte,
       frame rate a confronto con i video (un gioco VGA interlacciato a 60 fps smentirebbe
       il modello "CPI 1 + vblank per frame").
