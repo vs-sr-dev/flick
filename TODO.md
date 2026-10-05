@@ -65,7 +65,9 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       giocatore 1, secondo = giocatore 2, collegamento a caldo; colori Xbox = colori
       HyperScan; la tastiera prende il primo giocatore senza pad (con un pad solo è il
       giocatore 2; con due torna sull'1, sommata al pad: fonti separate in `input.c`);
-      pannello carte navigabile col pad. **Da provare dall'utente** (pad Xbox One).
+      pannello carte navigabile col pad. **Provato dall'utente:** Marvel Heroes in due
+      (pad Xbox One + tastiera); le carte dei due giocatori si scansionano una alla volta,
+      quindi basta un solo lettore.
 - [ ] Gamepad: aprire il pannello carte dal pad (una combinazione, es. View+LB) e
       rimappatura dei tasti nel file di configurazione.
 - [ ] Save state (CPU, RAM, device, scheduler; formato versionato).
