@@ -68,6 +68,9 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 
 ### 3. Fedeltà, da verificare
 - [ ] **IWL:** le voci escono a picco -18 dBFS (il gioco imposta VolSel 1): ascoltarle.
+- [ ] **IWL, audio mancante in alcune parti** (confermato dall'utente 2026-10-18, nel README
+      fra i problemi noti): IWL usa un percorso audio diverso dagli altri giochi; anche la
+      vecchia patch SPU del fork MAME faceva suonare gli altri ma non IWL. Da indagare.
 - [ ] **X-Men, menu:** col nuovo I2C i pad sono letti 30 volte al secondo invece di 15; se
       i menu seguono il polling potrebbero animarsi al doppio. Confronto coi video.
 - [ ] Gameplay di Spider-Man e IWL col preset fast: carte, frame rate a confronto con i video.

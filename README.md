@@ -29,6 +29,13 @@ Later milestones: a timing model fitted to captures from real hardware, since MA
 6 cycles per instruction makes the heavy games run at half speed (M4); a boot without the
 BIOS (M5). The analysis behind this plan is in [RECON.md](RECON.md).
 
+### Known issues
+
+- **IWL: sound missing in places.** IWL - Interstellar Wrestling League plays its sound
+  through a different path from the other four games, and parts of it are silent. This is
+  expected for now: an earlier experimental SPU patch for MAME had the same result (the
+  other games played, IWL did not).
+
 ## Legal
 
 This repository contains **no** BIOS, game code or disc data. You need your own dump of
