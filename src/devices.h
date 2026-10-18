@@ -33,6 +33,7 @@ extern uint8_t g_pad[2][4];      /* IN.0, IN.1 (buttons), IN.2 (Y), IN.3 (X) */
 void screen_init(void);
 void screen_configure(int width, int height, int vis_w, int vis_h, atto_t frame_period);
 int screen_vpos(void);
+atto_t screen_vpos_change_time(void);   /* when screen_vpos() next changes */
 int screen_width(void), screen_height(void);
 uint32_t tv_read(uint32_t off);
 void tv_write(uint32_t off, uint32_t data, uint32_t mask);

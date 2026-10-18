@@ -71,6 +71,12 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [ ] **X-Men, menu:** col nuovo I2C i pad sono letti 30 volte al secondo invece di 15; se
       i menu seguono il polling potrebbero animarsi al doppio. Confronto coi video.
 - [ ] Gameplay di Spider-Man e IWL col preset fast: carte, frame rate a confronto con i video.
+- [x] **IWL a scatti (2026-10-18):** il lettore video aspetta la riga 240 leggendo il contatore
+      di riga del PPU (0x94); con l'I/O nel ciclo lo skip degli idle loop non scattava e la
+      fase video andava al 42%. Ora le letture "ferme fino a un istante" (sched_io_steady)
+      permettono lo skip: 2500-3300%, uscite identiche al byte (PNG, WAV, ciclo finale).
+- [ ] IWL, t=56-60 s: ritardo software a contatori in RAM (a00196f0), 76-108% di velocità;
+      lavoro vero (a0024c88, decompressione?) a ~140%. Un PC lento potrebbe scattare lì.
 - [ ] IRQ di riga del PPU (irq_control bit 2, irq_timing_v/h) non emulato, nemmeno da MAME;
       Ben 10 lo abilita a riga 120 in due giocatori (gestore via BIOS), senza effetti visibili.
 - [ ] Canali hardware: loop (tone mode 2, LoopAddr) non implementati; senso esatto del

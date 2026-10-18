@@ -16,6 +16,8 @@ typedef struct score7 {
 	/* timing model beyond MAME (all off by default = MAME's behaviour) */
 	int idle_skip;                            /* fast-forward provably idle loops */
 	uint64_t stores, io_total, idle_skipped;  /* bookkeeping for idle_skip */
+	/* reads whose value is known not to change before cycle steady_until (sched_io_steady) */
+	uint64_t io_steady, steady_until;
 } score7_t;
 
 extern score7_t g_cpu;

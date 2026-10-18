@@ -60,6 +60,13 @@ int screen_vpos(void)
 	return (s_vis_h + vpos) % s_height;
 }
 
+/* when screen_vpos() next changes: the start of the next line, half a pixel early as above */
+atto_t screen_vpos_change_time(void)
+{
+	const atto_t delta = sched_time() - s_vblank_start_time + s_pixeltime / 2;
+	return s_vblank_start_time + (delta / s_scantime + 1) * s_scantime - s_pixeltime / 2;
+}
+
 int screen_width(void)  { return s_vis_w; }
 int screen_height(void) { return s_vis_h; }
 

@@ -8,6 +8,7 @@
 #include "devices.h"
 #include "score7.h"
 #include "bus.h"
+#include "sched.h"
 
 typedef struct {
 	uint32_t control, attribute, posx, posy, nptr, blend;
@@ -116,7 +117,9 @@ uint32_t ppu_read(uint32_t off)
 	case 0x88: return m_irq_timing_v;
 	case 0x8c: return m_irq_timing_h;
 	case 0x90: return m_vblank_lines;
-	case 0x94: return m_vblank_lines + screen_vpos();
+	case 0x94:                               /* line counter: steady until the next line */
+		sched_io_steady(screen_vpos_change_time());
+		return m_vblank_lines + screen_vpos();
 	case 0xa0: case 0xa4: case 0xa8: return m_txs[0].buf_start[offset & 3];
 	case 0xac: case 0xb0: case 0xb4: return m_txs[1].buf_start[(offset + 1) & 3];
 	case 0xb8: case 0xbc: case 0xc0: return m_txs[2].buf_start[(offset + 2) & 3];

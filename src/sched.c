@@ -52,6 +52,15 @@ atto_t sched_time(void)
 	return (atto_t)g_cpu.cycles * s_aps;
 }
 
+void sched_io_steady(atto_t t)
+{
+	if (s_cb_timer) return;                  /* only the CPU's own reads count */
+	/* the first cycle c with c * aps >= t: a read at any earlier cycle sees the same value */
+	const atto_t c = (t + s_aps - 1) / s_aps;
+	g_cpu.io_steady++;
+	if (c < g_cpu.steady_until) g_cpu.steady_until = c > UINT64_MAX ? UINT64_MAX : (uint64_t)c;
+}
+
 void timer_adjust(emu_timer *t, atto_t delay, int param, atto_t period)
 {
 	if (t == s_cb_timer) s_cb_modified = 1;

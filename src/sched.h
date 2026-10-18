@@ -32,5 +32,8 @@ atto_t sched_time(void);        /* MAME's machine().time() for the current conte
 int sched_in_callback(void);    /* 1 inside a timer callback, 0 in CPU context */
 extern uint64_t g_next_event_cycle;   /* CPU runs while cycles < this */
 void sched_fire_due(void);      /* fire every timer due at the CPU's current cycle */
+/* a device read by the CPU returned a value that stays the same until time t (unless an
+ * event or a write changes it): lets the idle-loop skip go over polling loops */
+void sched_io_steady(atto_t t);
 
 #endif

@@ -1303,20 +1303,24 @@ static const op_handler s_opcode16_table[8] =
  * register unchanged, and no store or I/O access in between, repeats forever until an
  * event: memory and registers are the same at each iteration. Whole iterations are skipped
  * up to the next event (never past it), so the resulting state and timing are exactly
- * those of executing the loop. Off while tracing, as it changes instruction counts. */
+ * those of executing the loop. Off while tracing, as it changes instruction counts.
+ * A loop may also read devices whose value is steady until a known time (the PPU's line
+ * counter: a raster wait in IWL's video player): then it is skipped up to that time too. */
 #define LOOP_REGS (sizeof(g_cpu.gpr) + sizeof(g_cpu.cr) + sizeof(g_cpu.sr) + sizeof(g_cpu.ce))
 static uint32_t s_loop_pc = 1;
-static uint64_t s_loop_cycles, s_loop_stores, s_loop_io;
+static uint64_t s_loop_cycles, s_loop_stores, s_loop_io, s_loop_steady;
 static uint32_t s_loop_regs[LOOP_REGS / 4];
 
 static void idle_check(void)
 {
-	if (s_loop_pc == m_pc && s_loop_stores == g_cpu.stores && s_loop_io == g_cpu.io_total
+	if (s_loop_pc == m_pc && s_loop_stores == g_cpu.stores
+		&& g_cpu.io_total - s_loop_io == g_cpu.io_steady - s_loop_steady
 		&& !(g_cpu.pending && (REG_PSR & 1))
 		&& !memcmp(s_loop_regs, g_cpu.gpr, LOOP_REGS))
 	{
 		const uint64_t period = g_cpu.cycles - s_loop_cycles;
-		const uint64_t target = g_next_event_cycle;
+		uint64_t target = g_next_event_cycle;
+		if (g_cpu.io_total != s_loop_io && g_cpu.steady_until < target) target = g_cpu.steady_until;
 		if (period && target != UINT64_MAX && target > g_cpu.cycles)
 		{
 			const uint64_t k = (target - g_cpu.cycles) / period;
@@ -1328,6 +1332,8 @@ static void idle_check(void)
 	s_loop_cycles = g_cpu.cycles;
 	s_loop_stores = g_cpu.stores;
 	s_loop_io = g_cpu.io_total;
+	s_loop_steady = g_cpu.io_steady;
+	g_cpu.steady_until = UINT64_MAX;
 	memcpy(s_loop_regs, g_cpu.gpr, LOOP_REGS);
 }
 
@@ -1340,6 +1346,7 @@ void score7_reset(void)
 	memset(&g_cpu, 0, sizeof(g_cpu));
 	s_inq_n = 0;
 	s_loop_pc = 1;
+	g_cpu.steady_until = UINT64_MAX;
 	g_cpu.cpi = 6;
 	REG_EXCPVEC = m_pc = 0x9f000000;
 }
