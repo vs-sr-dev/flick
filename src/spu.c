@@ -12,6 +12,12 @@
  * Hardware channels 0-23: 4-bit IMA ADPCM, ADPCM36 or 8-/16-bit PCM with end codes; an
  * ended channel raises the FIQ. Loops (tone mode 2) are not implemented yet.
  *
+ * Channel status (0x103c/0x143c, a bit per playing channel) and stop flags (0x102c/0x142c,
+ * set when a sample ends, cleared by writing 1; a channel with its flag set does not start)
+ * as MAME's SPG2xx, with g_spu_ch_status. The fork reads back whatever was written: IWL,
+ * which plays its sounds on channel 0 and polls the status after starting one, then saw
+ * the channel idle, stopped it and set it up again, so only its first ~60 samples played.
+ *
  * The BIOS plays its boot jingle through the FIFO too, but sets it up the other way round:
  * enable (0x1088 = 0x4007) first, then the base address and the sample clock, and its
  * control flags (0x1034 = 0x10cb) lack bit 9, which the fork takes as the software-channel
@@ -97,7 +103,7 @@ static uint32_t m_dac_rate, m_dac_half_frames;
 static int m_dac_stereo, m_dma_on;
 static int16_t m_ring[RING_SIZE * 2];
 static uint32_t m_ring_head, m_ring_tail, m_ring_frac;
-static uint32_t m_ctrl_flags, m_main_vol, m_ch_enable;
+static uint32_t m_ctrl_flags, m_main_vol, m_ch_enable, m_ch_stop;
 static spu_channel m_channel[24];
 static uint32_t m_regs[0x10000 / 4];
 
@@ -108,6 +114,7 @@ static uint32_t s_out_head, s_out_tail;
 static uint64_t s_samples_done;          /* stream position, samples since reset */
 int g_spu_output_enabled;
 int g_spu_bios_dac;
+int g_spu_ch_status;
 
 static uint16_t read_word(uint32_t a)
 {
@@ -209,8 +216,9 @@ static void stop_channel(int ch)
 static void start_channel(int ch)
 {
 	spu_channel *c = &m_channel[ch];
-	// a re-trigger with the same Waddr resumes (IWL re-enables ch0 every frame)
-	if (c->started_waddr != c->waddr)
+	// the fork resumed a re-trigger with the same Waddr, a workaround for IWL re-enabling
+	// ch0 every frame (in fact the missing status register, above); SPG2xx always restarts
+	if (g_spu_ch_status || c->started_waddr != c->waddr)
 	{
 		c->cur_waddr = c->waddr;
 		c->sample_shift = 0;
@@ -282,6 +290,7 @@ static void stream_render(uint32_t n)
 				{
 					stop_channel(ch);
 					c->started_waddr = 0xffffffff;  // natural end: the next ChEn=1 restarts
+					if (g_spu_ch_status) m_ch_stop |= 1u << ch;
 					score7_set_input(IRQ_SPU_FIQ);
 					break;
 				}
@@ -441,7 +450,7 @@ void spu_init(void)
 	m_dac_rate = m_dac_half_frames = 0;
 	m_dac_stereo = m_dma_on = 0;
 	m_ring_head = m_ring_tail = m_ring_frac = 0;
-	m_ctrl_flags = m_main_vol = m_ch_enable = 0;
+	m_ctrl_flags = m_main_vol = m_ch_enable = m_ch_stop = 0;
 	memset(m_regs, 0, sizeof(m_regs));
 	memset(m_ring, 0, sizeof(m_ring));
 	for (int i = 0; i < 24; i++)
@@ -456,8 +465,25 @@ void spu_init(void)
 	timer_adjust(s_tick, hz_to_atto(50), 0, hz_to_atto(50));
 }
 
+/* the channels playing now, as 0x103c/0x143c report them */
+static uint32_t busy_channels(void)
+{
+	uint32_t b = 0;
+	for (int ch = 0; ch < 24; ch++)
+		if (m_channel[ch].active) b |= 1u << ch;
+	return b;
+}
+
 uint32_t spu_read(uint32_t off)
 {
+	if (g_spu_ch_status)
+		switch (off)
+		{
+		case 0x102c: stream_update(); return m_ch_stop & 0xffff;          // channel stop flags
+		case 0x142c: stream_update(); return m_ch_stop >> 16;
+		case 0x103c: stream_update(); return busy_channels() & 0xffff;   // channel status
+		case 0x143c: stream_update(); return busy_channels() >> 16;
+		}
 	switch (off)
 	{
 	case 0x1000: return m_ch_enable;
@@ -493,11 +519,19 @@ void spu_write(uint32_t off, uint32_t data, uint32_t mask)
 			if (ch >= 24) break;
 			const int was = (old_en >> ch) & 1, now = (m_ch_enable >> ch) & 1;
 			if (was == now) continue;
-			if (now) start_channel(ch);
-			else stop_channel(ch);
+			if (now && !(g_spu_ch_status && (m_ch_stop >> ch) & 1)) start_channel(ch);
+			else if (!now) stop_channel(ch);
 		}
 		break;
 	}
+	case 0x102c:  // channel stop flags [15:0], [23:16]: writing 1 clears
+	case 0x142c:
+		if (g_spu_ch_status)
+		{
+			stream_update();
+			m_ch_stop &= ~((data & 0xffff) << (off == 0x142c ? 16 : 0));
+		}
+		break;
 	case 0x1004:  // MAIN_VOL
 		stream_update();
 		COMBINE(m_main_vol, data, mask);

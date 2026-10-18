@@ -18,7 +18,7 @@ Mattel or Sunplus.
 | X-Men | playable with cards; the experience a character gains is saved on its card |
 | Marvel Heroes | playable with cards, one or two players |
 | Ben 10 | playable with cards, one or two players (about two minutes of loading at boot) |
-| IWL - Interstellar Wrestling League | playable with cards; some of the sound is missing (see [Known issues](#known-issues)) |
+| IWL - Interstellar Wrestling League | playable with cards |
 | Spider-Man | reaches gameplay; not tried with cards yet |
 
 ## Getting started
@@ -107,9 +107,6 @@ system-wide, say) `flick.ini` goes in `~/.config/flick/` and the rest in
 
 ## Known issues
 
-- **IWL: some sound is missing.** IWL plays its sound through a different path from the
-  other four games, and parts of it are silent. An earlier experimental sound patch for
-  MAME had the same result: the other games played, IWL did not.
 - **Loading times** follow MAME's CD drive, which answers instantly; the real console
   takes longer to seek. Fitting them to the hardware is still to do.
 - On a slow PC a few stretches of IWL (loading, decompression) may not hold full speed.

@@ -86,10 +86,13 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       già lo stato video.
 
 ### 3. Fedeltà, da verificare
-- [ ] **IWL:** le voci escono a picco -18 dBFS (il gioco imposta VolSel 1): ascoltarle.
-- [ ] **IWL, audio mancante in alcune parti** (confermato dall'utente 2026-10-18, nel README
-      fra i problemi noti): IWL usa un percorso audio diverso dagli altri giochi; anche la
-      vecchia patch SPU del fork MAME faceva suonare gli altri ma non IWL. Da indagare.
+- [x] **IWL, audio mancante** (2026-10-18): non erano i loop. IWL suona sul canale 0 (ADPCM
+      one-shot, modo 0x9037) e dopo l'avvio legge lo stato dei canali (0x103c); il fork
+      restituiva l'ultimo valore scritto, il gioco vedeva il canale fermo, lo spegneva e lo
+      rifaceva: ~60 campioni e poi niente. Ora stato e flag di stop (0x102c) come SPG2xx
+      (preset fast). La traccia vocale del video iniziale c'è, "qualità perfetta" (utente).
+      Gli altri quattro giochi: WAV identico al byte; regressione identica.
+- [ ] IWL: sentire il resto (menu, incontri) per conferma; voci a picco -18 dBFS (VolSel 1).
 - [ ] **X-Men, menu:** col nuovo I2C i pad sono letti 30 volte al secondo invece di 15; se
       i menu seguono il polling potrebbero animarsi al doppio. Confronto coi video.
 - [ ] Gameplay di Spider-Man e IWL col preset fast: carte, frame rate a confronto con i video.

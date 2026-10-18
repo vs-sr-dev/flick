@@ -121,6 +121,7 @@ static void set_timing(int fast)
 	g_card_scaled = fast;
 	g_cpu.idle_skip = fast;
 	g_spu_bios_dac = fast;
+	g_spu_ch_status = fast;
 	g_i2c_sysclk = fast;
 }
 
