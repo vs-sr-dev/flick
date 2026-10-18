@@ -60,7 +60,9 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       più larga) / CRT (composito + scanline). Screenshot e dump restano senza filtro.
 - [ ] Modo "passa la carta" (es. Maiusc+Invio): la carta resta ~2 s e si toglie da sola;
       oggi in due giocatori serve F2 fra una carta e l'altra (vedi README).
-- [ ] Gamepad: aprire il pannello carte dal pad (es. View+LB), rimappatura dei tasti.
+- [x] Rimappatura: pannello dei controlli (F4, pulsante sulla barra), tastiera e controller,
+      salvata in `flick.ini` (2026-10-18).
+- [ ] Gamepad: aprire i pannelli dal pad (es. View+LB per le carte).
 - [ ] Save state (CPU, RAM, device, scheduler; formato versionato). Il dump di debug ha
       già lo stato video.
 

@@ -11,9 +11,11 @@ option(HS_SDL "Build the SDL2 frontend (window, input)" ON)
 
 add_executable(flick
   src/main.c src/machine.c src/bus.c src/sched.c src/score7.c src/trace.c
-  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c src/cards.c src/cardlist.c src/font.c src/ui.c src/toolbar.c src/os.c src/dump.c src/config.c)
+  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c src/cards.c src/cardlist.c src/font.c src/ui.c src/toolbar.c src/os.c src/dump.c src/config.c src/controls.c)
 target_compile_options(flick PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-type-limits)
 if(WIN32)
+  enable_language(RC)
+  target_sources(flick PRIVATE res/flick.rc)      # the icon (res/flick.ico, from tools/mkicon.py)
   target_link_libraries(flick PRIVATE comdlg32)   # the "open a disc" dialog
 endif()
 

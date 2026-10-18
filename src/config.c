@@ -5,7 +5,7 @@
 #include "config.h"
 #include "os.h"
 
-config g_config = { "", "", 100, 1, 1 };
+config g_config = { .volume = 100, .scale = 1, .fast = 1 };
 
 static void config_path(char *out, size_t n)
 {
@@ -45,6 +45,10 @@ int config_load(void)
 		else if (!strcmp(key, "volume")) g_config.volume = clamp(atoi(val), 0, 100);
 		else if (!strcmp(key, "scale")) g_config.scale = clamp(atoi(val), 1, 8);
 		else if (!strcmp(key, "timing")) g_config.fast = strcmp(val, "mame") != 0;
+		else if (!strncmp(key, "key_", 4) && input_button_id(key + 4) >= 0)
+			snprintf(g_config.key[input_button_id(key + 4)], sizeof(g_config.key[0]), "%s", val);
+		else if (!strncmp(key, "pad_", 4) && input_button_id(key + 4) >= 0)
+			snprintf(g_config.pad[input_button_id(key + 4)], sizeof(g_config.pad[0]), "%s", val);
 	}
 	fclose(f);
 	return 1;
@@ -62,5 +66,9 @@ int config_save(void)
 	fprintf(f, "volume = %d\n", g_config.volume);
 	fprintf(f, "scale = %d\n", g_config.scale);
 	fprintf(f, "timing = %s\n", g_config.fast ? "fast" : "mame");
+	for (int b = 0; b < BTN_COUNT; b++)
+		if (g_config.key[b][0]) fprintf(f, "key_%s = %s\n", input_button_name(b), g_config.key[b]);
+	for (int b = 0; b < BTN_COUNT; b++)
+		if (g_config.pad[b][0]) fprintf(f, "pad_%s = %s\n", input_button_name(b), g_config.pad[b]);
 	return fclose(f) == 0;
 }

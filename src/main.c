@@ -23,6 +23,7 @@
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
+#include "controls.h"
 #endif
 
 #define HS_VERSION "0.1.0-dev"
@@ -201,16 +202,6 @@ static int run_headless(uint64_t end_cycle, uint64_t frames)
 }
 
 #ifdef HS_HAVE_SDL
-static const struct { SDL_Scancode sc; int button; } s_keymap[] = {
-	{ SDL_SCANCODE_UP, BTN_UP }, { SDL_SCANCODE_DOWN, BTN_DOWN },
-	{ SDL_SCANCODE_LEFT, BTN_LEFT }, { SDL_SCANCODE_RIGHT, BTN_RIGHT },
-	{ SDL_SCANCODE_Z, BTN_GREEN }, { SDL_SCANCODE_X, BTN_RED },
-	{ SDL_SCANCODE_C, BTN_YELLOW }, { SDL_SCANCODE_V, BTN_BLUE },
-	{ SDL_SCANCODE_RETURN, BTN_START }, { SDL_SCANCODE_BACKSPACE, BTN_SELECT },
-	{ SDL_SCANCODE_A, BTN_LSHOULDER }, { SDL_SCANCODE_S, BTN_RSHOULDER },
-	{ SDL_SCANCODE_Q, BTN_LTRIGGER }, { SDL_SCANCODE_W, BTN_RTRIGGER },
-};
-
 /* ---- console controls: toolbar, keys, files dropped on the window ---- */
 static int s_paused, s_volume = 100, s_muted, s_scale = 1, s_fullscreen;
 static int s_mouse_x = -1, s_mouse_y = -1;
@@ -405,27 +396,14 @@ static void controller_removed(SDL_JoystickID id)
 		}
 }
 
-/* colours as on the Xbox pad: A green, B red, X blue, Y yellow */
+/* the HyperScan buttons from each controller (bindings in controls.c), the stick as is */
 static void controllers_poll(void)
 {
-	static const struct { SDL_GameControllerButton b; int btn; } map[] = {
-		{ SDL_CONTROLLER_BUTTON_A, BTN_GREEN }, { SDL_CONTROLLER_BUTTON_B, BTN_RED },
-		{ SDL_CONTROLLER_BUTTON_X, BTN_BLUE }, { SDL_CONTROLLER_BUTTON_Y, BTN_YELLOW },
-		{ SDL_CONTROLLER_BUTTON_LEFTSHOULDER, BTN_LSHOULDER },
-		{ SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, BTN_RSHOULDER },
-		{ SDL_CONTROLLER_BUTTON_START, BTN_START }, { SDL_CONTROLLER_BUTTON_BACK, BTN_SELECT },
-		{ SDL_CONTROLLER_BUTTON_DPAD_UP, BTN_UP }, { SDL_CONTROLLER_BUTTON_DPAD_DOWN, BTN_DOWN },
-		{ SDL_CONTROLLER_BUTTON_DPAD_LEFT, BTN_LEFT }, { SDL_CONTROLLER_BUTTON_DPAD_RIGHT, BTN_RIGHT },
-	};
 	for (int p = 0; p < 2; p++)
 	{
 		SDL_GameController *c = s_ctrl[p];
 		if (!c) continue;
-		uint32_t btn = 0;
-		for (int i = 0; i < (int)(sizeof(map) / sizeof(map[0])); i++)
-			if (SDL_GameControllerGetButton(c, map[i].b)) btn |= 1u << map[i].btn;
-		if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16000) btn |= 1u << BTN_LTRIGGER;
-		if (SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000) btn |= 1u << BTN_RTRIGGER;
+		uint32_t btn = ctl_pad_buttons(c);
 		if (s_ctrl_hold[p] && btn) btn = 0;
 		else s_ctrl_hold[p] = 0;
 		input_joy(p, btn, SDL_GameControllerGetAxis(c, SDL_CONTROLLER_AXIS_LEFTX),
@@ -460,6 +438,12 @@ static void toggle_panel(void)
 	}
 	else
 		SDL_StopTextInput();
+}
+
+/* a panel (cards or controls) is open: the console stops and the toolbar hides */
+static int panel_open(void)
+{
+	return ui_panel_open() || ctl_open();
 }
 
 /* the largest whole multiple of 640x480 that fits the window's display */
@@ -497,7 +481,15 @@ static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio
 #endif
 		break;
 	}
-	case TB_CARDS: toggle_panel(); break;
+	case TB_CARDS:
+		if (ctl_open()) ctl_toggle();
+		toggle_panel();
+		break;
+	case TB_CONTROLS:
+		if (ui_panel_open()) toggle_panel();
+		ctl_toggle();
+		if (ctl_open()) release_pad();
+		break;
 	case TB_CARD_OFF: ui_key(UI_REMOVE); break;
 	case TB_PAUSE:
 		s_paused = !s_paused;
@@ -543,6 +535,11 @@ static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDevi
 	const SDL_Keycode sym = k->keysym.sym;
 	const int alt = (k->keysym.mod & KMOD_ALT) != 0, ctrl = (k->keysym.mod & KMOD_CTRL) != 0;
 
+	if (ctl_open())                              /* the controls panel takes every key */
+	{
+		ctl_key(k);
+		return;
+	}
 	if (down && !k->repeat)
 	{
 		int cmd = TB_NONE;
@@ -551,10 +548,11 @@ static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDevi
 		else if (sym == SDLK_F1) cmd = TB_CARDS;
 		else if (sym == SDLK_F2) cmd = TB_CARD_OFF;
 		else if (sym == SDLK_F3) cmd = TB_TIMING;
+		else if (sym == SDLK_F4) cmd = TB_CONTROLS;
 		else if (sym == SDLK_F5) cmd = TB_RESET;
 		else if (sym == SDLK_F12 && ctrl) { dump_now(); return; }
 		else if (sym == SDLK_F12) cmd = TB_SHOT;
-		else if (sym == SDLK_PAUSE || (sym == SDLK_p && !ui_panel_open())) cmd = TB_PAUSE;
+		else if (sym == SDLK_PAUSE || (sym == SDLK_p && !panel_open())) cmd = TB_PAUSE;
 		if (cmd != TB_NONE)
 		{
 			command(cmd, 0, win, audio);
@@ -584,9 +582,8 @@ static void key_event(const SDL_KeyboardEvent *k, SDL_Window *win, SDL_AudioDevi
 		return;
 	}
 	if (k->repeat || s_paused) return;
-	for (int i = 0; i < (int)(sizeof(s_keymap) / sizeof(s_keymap[0])); i++)
-		if (k->keysym.scancode == s_keymap[i].sc)
-			input_set(s_kbd_pad, s_keymap[i].button, down);
+	const int button = ctl_key_button(k->keysym.scancode);
+	if (button >= 0) input_set(s_kbd_pad, button, down);
 }
 
 static tb_state toolbar_state(void)
@@ -616,6 +613,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 	SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, 640, 480);
 	window_title(win, cdpath);
 	s_volume = g_config.volume;
+	ctl_init();
 	if (g_config.scale > 1) set_scale(win, g_config.scale);
 	if (ask_disc)                                /* started with no disc: offer one */
 	{
@@ -677,6 +675,11 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 				if (ev.button.button != SDL_BUTTON_LEFT || ui_panel_open()) break;
+				if (ctl_open())
+				{
+					ctl_click(ev.button.x, ev.button.y);
+					break;
+				}
 				/* a click on a hidden toolbar only shows it */
 				if (tb_visible(&st, now)) cmd = tb_press(ev.button.x, ev.button.y, now, &value);
 				else tb_mouse(ev.button.x, ev.button.y, now, &value);
@@ -697,6 +700,10 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 				break;
 			case SDL_CONTROLLERBUTTONDOWN:
 				if (ui_panel_open()) controller_panel(ev.cbutton.button);
+				else if (ctl_open() && ctl_pad_button(ev.cbutton.button)) s_ctrl_hold[0] = s_ctrl_hold[1] = 1;
+				break;
+			case SDL_CONTROLLERAXISMOTION:
+				if (ctl_open()) ctl_pad_axis(ev.caxis.axis, ev.caxis.value);
 				break;
 			case SDL_TEXTINPUT:
 				if (ui_panel_open()) ui_text(ev.text.text);
@@ -708,9 +715,9 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 			}
 		}
 		timed_updates();
-		if (!ui_panel_open() && !s_paused) controllers_poll();
+		if (!panel_open() && !s_paused) controllers_poll();
 
-		if (ui_panel_open() || s_paused)
+		if (panel_open() || s_paused)
 		{
 			/* stopped: keep the pacing baseline with the wall clock */
 			t0 = SDL_GetPerformanceCounter();
@@ -756,7 +763,8 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 		SDL_RenderClear(ren);
 		SDL_RenderCopy(ren, tex, &src, NULL);
 		int drawn = ui_render(overlay, now);
-		if (!ui_panel_open()) drawn |= tb_render(overlay, &st, now);
+		drawn |= ctl_render(overlay, now);
+		if (!panel_open()) drawn |= tb_render(overlay, &st, now);
 		if (drawn)
 		{
 			SDL_UpdateTexture(otex, NULL, overlay, 640 * 4);
@@ -773,7 +781,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 		}
 
 		/* without audio: real-time pacing on emulated time */
-		if (!audio && !s_paused && !ui_panel_open())
+		if (!audio && !s_paused && !panel_open())
 		{
 			const double emu_s = (double)(g_cpu.cycles - c0) / CPU_CLOCK;
 			const double host_s = (double)(SDL_GetPerformanceCounter() - t0) / freq;

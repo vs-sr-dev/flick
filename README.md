@@ -73,7 +73,10 @@ usual.
 | `-v` | verbose log |
 
 Pad: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
-A/S = shoulders, Q/W = triggers.
+A/S = shoulders, Q/W = triggers. These are the defaults: the controls panel (F4, or the
+controller button on the toolbar) changes the keyboard and controller bindings. Click a
+cell (or Enter) and press the new key or button; a key already in use swaps places, Del
+clears one. The bindings are kept in `flick.ini`.
 
 Game controllers (anything SDL knows as a game controller, e.g. Xbox or PlayStation pads):
 the first one plugged in is player 1, the second player 2. The keyboard takes the first
@@ -93,6 +96,7 @@ seconds. Its buttons, with their keys:
 | pause | P, Pause | pause and resume |
 | reset | F5 | restart the console (the disc and the card stay) |
 | FAST / MAME | F3 | switch the timing preset (see below) |
+| controller | F4 | the controls panel (see above) |
 | camera | F12 | save a screenshot in `screenshots/` next to the executable |
 | | Ctrl+F12 | debug dump in `debug/` next to the executable: RAM, PPU and TV state, frame (for reporting graphics glitches) |
 | 1x / 2x | | window size |

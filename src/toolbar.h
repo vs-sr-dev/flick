@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 enum { TB_NONE, TB_DISC, TB_CARDS, TB_CARD_OFF, TB_PAUSE, TB_RESET, TB_TIMING,
-       TB_SHOT, TB_SCALE, TB_FULLSCREEN, TB_MUTE, TB_VOLUME };
+       TB_SHOT, TB_SCALE, TB_FULLSCREEN, TB_MUTE, TB_VOLUME, TB_CONTROLS };
 
 /* what the buttons show */
 typedef struct {

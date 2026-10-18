@@ -17,7 +17,7 @@
 #define HIDE_AFTER 2.5
 
 enum { IC_DISC, IC_CARD, IC_EJECT, IC_PAUSE, IC_PLAY, IC_RESET, IC_CAMERA, IC_FULL,
-       IC_WINDOW, IC_SPEAKER, IC_MUTED, IC_COUNT };
+       IC_WINDOW, IC_SPEAKER, IC_MUTED, IC_PAD, IC_COUNT };
 
 static const char s_icon[IC_COUNT][12][13] = {
 	[IC_DISC] = {
@@ -64,6 +64,10 @@ static const char s_icon[IC_COUNT][12][13] = {
 		"............", ".....#......", "....##......", "...###......",
 		"######.#...#", "######..#.#.", "######...#..", "######..#.#.",
 		"...###.#...#", "....##......", ".....#......", "............" },
+	[IC_PAD] = {
+		"............", "............", "..########..", ".#........#.",
+		"#..#....#..#", "#.###..#.#.#", "#..#....#..#", "#..........#",
+		"#...####...#", "#..#....#..#", ".##......##.", "............" },
 };
 
 typedef struct { int cmd, x, w; } button;
@@ -73,7 +77,7 @@ static const button s_buttons[] = {
 	{ TB_DISC, 6, 28 }, { TB_CARDS, 36, 28 }, { TB_CARD_OFF, 66, 28 },
 	{ TB_PAUSE, 106, 28 }, { TB_RESET, 136, 28 },
 	{ TB_TIMING, 176, 56 },
-	{ TB_SHOT, 418, 28 }, { TB_SCALE, 448, 32 }, { TB_FULLSCREEN, 482, 28 },
+	{ TB_CONTROLS, 378, 28 }, { TB_SHOT, 418, 28 }, { TB_SCALE, 448, 32 }, { TB_FULLSCREEN, 482, 28 },
 	{ TB_MUTE, 522, 28 }, { TB_VOLUME, 554, 78 },
 };
 #define NBUTTONS ((int)(sizeof(s_buttons) / sizeof(s_buttons[0])))
@@ -186,6 +190,7 @@ static const char *tooltip(const button *b, const tb_state *st)
 	case TB_PAUSE: return st->paused ? "Resume (P)" : "Pause (P)";
 	case TB_RESET: return "Reset (F5)";
 	case TB_TIMING: return st->fast ? "Timing: fast. Click for MAME's (F3)" : "Timing: MAME's. Click for fast (F3)";
+	case TB_CONTROLS: return "Controls (F4)";
 	case TB_SHOT: return "Screenshot (F12)";
 	case TB_SCALE: return "Window size";
 	case TB_FULLSCREEN: return st->fullscreen ? "Leave full screen (F11)" : "Full screen (F11, Alt+Enter)";
@@ -216,6 +221,7 @@ int tb_render(uint32_t *ov, const tb_state *st, double now)
 		case TB_PAUSE: icon(ov, b, st->paused ? IC_PLAY : IC_PAUSE, st->paused ? C_GOLD : C_WHITE); break;
 		case TB_RESET: icon(ov, b, IC_RESET, C_WHITE); break;
 		case TB_TIMING: label(ov, b, st->fast ? "FAST" : "MAME", st->fast ? C_WHITE : C_GOLD); break;
+		case TB_CONTROLS: icon(ov, b, IC_PAD, C_WHITE); break;
 		case TB_SHOT: icon(ov, b, IC_CAMERA, C_WHITE); break;
 		case TB_SCALE:
 		{

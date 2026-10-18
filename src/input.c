@@ -21,6 +21,11 @@ int input_button_id(const char *name)
 	return -1;
 }
 
+const char *input_button_name(int id)
+{
+	return id >= 0 && id < BTN_COUNT ? s_btn[id].name : "";
+}
+
 /* each source keeps its own state, merged into g_pad: releasing a key does not centre a
  * stick held on the controller */
 static uint32_t s_keys[2], s_joy_btn[2];

@@ -9,6 +9,7 @@ enum { BTN_BLUE, BTN_START, BTN_SELECT, BTN_LSHOULDER, BTN_RSHOULDER, BTN_LTRIGG
        BTN_YELLOW, BTN_RED, BTN_GREEN, BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_COUNT };
 
 int input_button_id(const char *name);
+const char *input_button_name(int id);   /* "green", ...; "" for a bad id */
 /* keyboard and scripted presses */
 void input_set(int pad, int button, int down);
 /* a game controller on pad 0/1: buttons as 1 << BTN_* (the d-pad as BTN_UP..BTN_RIGHT),
