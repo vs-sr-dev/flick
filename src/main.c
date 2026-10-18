@@ -319,7 +319,14 @@ static int pick_bios(const char *missing)
 	{
 		SDL_ShowSimpleMessageBox(missing ? SDL_MESSAGEBOX_WARNING : SDL_MESSAGEBOX_INFORMATION, "Flick", m, NULL);
 		if (!os_pick_file(NULL, OS_PICK_BIOS, dir, p, sizeof(p))) return 0;
-		if (file_size(p) == FLASH_SIZE && machine_load_bios(p)) break;
+		if (file_size(p) == FLASH_SIZE && machine_load_bios(p))
+		{
+			if (machine_bios_crc() != BIOS_CRC32)
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Flick", "This 1 MB file is not the known "
+					"HyperScan BIOS dump (the one in MAME's hyprscan set, CRC32 ce346a14).\n\nFlick will "
+					"try it, but games may misbehave: please mention it if you report a problem.", NULL);
+			break;
+		}
 		snprintf(m, sizeof(m), "%s is not a HyperScan BIOS: the flash image is exactly 1 MB "
 			"(1048576 bytes).", base_name(p));
 		missing = p;
@@ -925,6 +932,14 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
+	/* another dump boots too, but what goes wrong with it says little about Flick */
+	char bios_warning[160] = "";
+	if (machine_bios_crc() != BIOS_CRC32)
+	{
+		snprintf(bios_warning, sizeof(bios_warning), "BIOS: not the known HyperScan dump (CRC32 %08x, "
+			"expected %08x)", machine_bios_crc(), BIOS_CRC32);
+		fprintf(stderr, "warning: %s\n", bios_warning);
+	}
 	if (fast < 0) fast = headless ? 1 : g_config.fast;   /* scripts get the same default every time */
 	if (cdpath && !(s_cd = cdimg_open(cdpath)))
 	{
@@ -947,6 +962,7 @@ int main(int argc, char **argv)
 		cards_set_dir(cards);
 	}
 	ui_init(cards_detect_game(s_cd));
+	if (bios_warning[0]) ui_toast(bios_warning);
 	if (cardpath && !card_load(cardpath))
 	{
 		report("cannot read card image %s (120 bytes expected)", cardpath);

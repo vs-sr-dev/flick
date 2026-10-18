@@ -33,7 +33,9 @@ Mattel or Sunplus.
      `./flick --bios /path/to/hyperscan.bin` and drop discs on the window.
 2. You need the **HyperScan BIOS**, `hyperscan.bin` (the console's 1 MB flash, the same
    file as in MAME's `hyprscan` set), and the **game discs** as `.cue`/`.bin` or `.iso`
-   images. Flick includes neither: dump your own.
+   images. Flick includes neither: dump your own. The known good BIOS is 1,048,576 bytes
+   with CRC32 `ce346a14` and SHA-1 `560cb747e7193e6781d4b8b0bd4d7b45d3d28690`; Flick warns
+   if yours differs (it still tries it, but please say so when you report a problem).
 3. Start `flick.exe` (or `flick` on Linux). The first time it asks for the BIOS; then it
    offers a disc.
    You can also open a `.cue` with Flick, or drop it on the window.

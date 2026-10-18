@@ -5,7 +5,7 @@
 
 static uint32_t crc_table[256];
 
-static uint32_t crc32_update(uint32_t c, const uint8_t *p, size_t n)
+uint32_t crc32_update(uint32_t c, const uint8_t *p, size_t n)
 {
 	if (!crc_table[1])
 		for (uint32_t i = 0; i < 256; i++)

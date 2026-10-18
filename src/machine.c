@@ -13,6 +13,7 @@
 #include "cdservo.h"
 #include "spu.h"
 #include "card.h"
+#include "png.h"
 #include "os.h"
 
 int g_log_uart;
@@ -28,6 +29,11 @@ int machine_load_bios(const char *path)
 	fclose(f);
 	if (n != FLASH_SIZE) hs_log("warning: %s is %u bytes, expected %u\n", path, (unsigned)n, FLASH_SIZE);
 	return 1;
+}
+
+uint32_t machine_bios_crc(void)
+{
+	return crc32_update(0, g_flash, FLASH_SIZE);
 }
 
 uint32_t io_read32(uint32_t a, uint32_t mask)
