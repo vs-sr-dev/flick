@@ -18,6 +18,7 @@ cards/
 # Build output
 build/
 build-release/
+build-linux/
 dist/
 
 # Python

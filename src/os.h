@@ -15,8 +15,18 @@ void os_utf8_args(int *argc, char ***argv);
 /* fopen for a UTF-8 path */
 FILE *os_fopen(const char *path, const char *mode);
 
+/* 64-bit file positions (disc images are bigger than 2 GB in theory, 700 MB in practice) */
+int os_fseek(FILE *f, long long off, int whence);
+long long os_ftell(FILE *f);
 /* folder of the executable, without a trailing separator ("." if unknown) */
 void os_exe_dir(char *out, size_t n);
+/* where flick.ini goes, and where cards/, screenshots/ and debug/ go (created if missing).
+ * Windows, and a Linux build unpacked in a writable folder: next to the executable.
+ * Otherwise (installed, AppImage): $XDG_CONFIG_HOME/flick and $XDG_DATA_HOME/flick. */
+void os_config_dir(char *out, size_t n);
+void os_data_dir(char *out, size_t n);
+/* 1 if os_pick_file can show a dialog (Windows; Linux with zenity or kdialog) */
+int os_can_pick(void);
 /* the GUI build started from a terminal: print to its console (output redirected to a
  * file or a pipe stays as it is); 0 if stderr goes nowhere (started by a double click) */
 int os_console_attach(void);

@@ -26,6 +26,9 @@ if(WIN32)
   configure_file(res/flick.rc.in "${CMAKE_BINARY_DIR}/flick.rc" @ONLY)
   target_sources(flick PRIVATE "${CMAKE_BINARY_DIR}/flick.rc")
   target_link_libraries(flick PRIVATE comdlg32 shell32)   # file dialogs, UTF-16 command line
+else()
+  target_compile_definitions(flick PRIVATE _FILE_OFFSET_BITS=64)   # 64-bit fseeko/ftello
+  target_link_libraries(flick PRIVATE m)
 endif()
 
 if(HS_SDL)

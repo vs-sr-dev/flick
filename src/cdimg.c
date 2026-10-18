@@ -18,9 +18,9 @@ uint32_t cdimg_lba_to_msf(uint32_t lba)
 
 static uint64_t file_size(FILE *f)
 {
-	fseeko64(f, 0, SEEK_END);
-	uint64_t n = ftello64(f);
-	fseeko64(f, 0, SEEK_SET);
+	os_fseek(f, 0, SEEK_END);
+	uint64_t n = os_ftell(f);
+	os_fseek(f, 0, SEEK_SET);
 	return n;
 }
 
@@ -152,7 +152,7 @@ static void read_partial(cdimg *cd, int tr, uint32_t lba, uint32_t chdsector, ui
 		memset(dest, 0, length);
 		return;
 	}
-	fseeko64(cd->f, (int64_t)(t->offset + (uint64_t)chdsector * t->datasize + startoffs), SEEK_SET);
+	os_fseek(cd->f, (int64_t)(t->offset + (uint64_t)chdsector * t->datasize + startoffs), SEEK_SET);
 	size_t n = fread(dest, 1, length, cd->f);     /* a short read leaves the rest untouched, as MAME */
 	(void)n;
 }

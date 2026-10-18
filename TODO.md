@@ -62,6 +62,17 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [x] Percorsi non ASCII: tutto UTF-8 dentro, API wide su Windows (argv, `os_fopen`,
       `os_mkdir`, dialoghi, cartella dell'exe); provato con `Prova àè ñ 日本`.
 
+### 1b. Linux e macOS
+- [x] **Linux** (2026-10-18, provato in WSL Ubuntu 24.04 + WSLg): compila senza warning,
+      traccia M1 identica a MAME (a meno dei CRLF del riferimento), stessa velocità.
+      Cartelle: accanto all'exe se scrivibile, sennò XDG; dialoghi con zenity/kdialog (provati
+      con un finto zenity); `tools/package_linux.sh` -> `flick-<ver>-linux-x86_64.tar.gz`
+      (SDL2 di sistema, glibc >= 2.34). Da pubblicare: decide l'utente.
+- [ ] Linux: provarlo su un desktop vero (zenity reale, gamepad, audio PulseAudio/PipeWire),
+      icona e voce `.desktop`; magari AppImage.
+- [ ] macOS: `os_exe_dir` c'è (non compilato); servono `~/Library/Application Support/Flick`,
+      dialogo (NSOpenPanel o osascript), `.app` con `.icns`, firma/notarizzazione. Serve un tester.
+
 ### 2. Frontend
 - [ ] Filtro TV: l'HyperScan esce solo in composito, che fonde il dithering dei giochi
       (RGB565 a trame alternate). Spento / composito (YIQ, luminanza ~3 px, crominanza molto

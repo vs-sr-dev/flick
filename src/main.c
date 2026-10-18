@@ -265,7 +265,6 @@ static void open_disc(SDL_Window *win, const char *path)
 	dir_name(path, g_config.disc_dir, sizeof(g_config.disc_dir));
 }
 
-#ifdef _WIN32
 static long file_size(const char *path)
 {
 	FILE *f = os_fopen(path, "rb");
@@ -289,6 +288,14 @@ static int pick_bios(const char *missing)
 	else
 		snprintf(m, sizeof(m), "Flick needs the HyperScan BIOS: hyperscan.bin, the 1 MB image of the "
 			"console's flash (the same file MAME uses).\n\nPlease choose it in the next window; Flick will remember it.");
+	if (!os_can_pick())                          /* Linux without zenity or kdialog */
+	{
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Flick", "Flick needs the HyperScan BIOS "
+			"(hyperscan.bin, the 1 MB flash image MAME uses).\n\nStart it once with\n"
+			"    flick --bios /path/to/hyperscan.bin\nand it will remember it (or install zenity "
+			"for a file dialog).", NULL);
+		return 0;
+	}
 	for (;;)
 	{
 		SDL_ShowSimpleMessageBox(missing ? SDL_MESSAGEBOX_WARNING : SDL_MESSAGEBOX_INFORMATION, "Flick", m, NULL);
@@ -302,13 +309,12 @@ static int pick_bios(const char *missing)
 	snprintf(g_config.bios, sizeof(g_config.bios), "%s", p);
 	return 1;
 }
-#endif
 
-/* screenshots/hyperscan-YYYYMMDD-HHMMSS[-n].png next to the executable */
+/* screenshots/hyperscan-YYYYMMDD-HHMMSS[-n].png in the data folder (os_data_dir) */
 static void screenshot(void)
 {
 	char dir[1024], name[64], path[1200], m[1300];
-	os_exe_dir(dir, sizeof(dir));
+	os_data_dir(dir, sizeof(dir));
 	snprintf(path, sizeof(path), "%s/screenshots", dir);
 	os_mkdir(path);
 	const time_t t = time(NULL);
@@ -330,11 +336,11 @@ static void screenshot(void)
 	ui_toast(m);
 }
 
-/* Ctrl+F12: debug/hyperscan-YYYYMMDD-HHMMSS/ next to the executable, for --render-dump */
+/* Ctrl+F12: debug/hyperscan-YYYYMMDD-HHMMSS/ in the data folder, for --render-dump */
 static void dump_now(void)
 {
 	char dir[1024], path[1200], m[1300];
-	os_exe_dir(dir, sizeof(dir));
+	os_data_dir(dir, sizeof(dir));
 	snprintf(path, sizeof(path), "%s/debug", dir);
 	os_mkdir(path);
 	const time_t t = time(NULL);
@@ -478,10 +484,8 @@ static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio
 		char p[1024];
 		if (os_pick_file(win, OS_PICK_DISC, g_config.disc_dir, p, sizeof(p)))
 			open_disc(win, p);
-#ifndef _WIN32
-		else
+		else if (!os_can_pick())
 			ui_toast("Drop a .cue or .iso file on the window");
-#endif
 		break;
 	}
 	case TB_CARDS:
@@ -891,7 +895,7 @@ int main(int argc, char **argv)
 	if (!bios || !machine_load_bios(bios))
 	{
 		int ok = 0;
-#if defined(HS_HAVE_SDL) && defined(_WIN32)
+#ifdef HS_HAVE_SDL
 		if (!headless && !bios_given) ok = pick_bios(bios);
 #endif
 		if (!ok)
@@ -913,7 +917,7 @@ int main(int argc, char **argv)
 	else
 	{
 		char dir[1024], cards[1100];
-		os_exe_dir(dir, sizeof(dir));
+		os_data_dir(dir, sizeof(dir));
 		snprintf(cards, sizeof(cards), "%s/cards", dir);
 		cards_set_dir(cards);
 	}

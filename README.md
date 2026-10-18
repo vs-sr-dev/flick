@@ -23,12 +23,19 @@ Mattel or Sunplus.
 
 ## Getting started
 
-1. Download `flick-<version>-win64.zip` from [Releases](https://github.com/vs-sr-dev/flick/releases)
-   and extract it anywhere (Windows, 64-bit).
+1. Download Flick from [Releases](https://github.com/vs-sr-dev/flick/releases) and extract it
+   anywhere:
+   - **Windows** (64-bit): `flick-<version>-win64.zip`.
+   - **Linux** (x86-64, glibc 2.34 or later: Ubuntu 22.04, Debian 12, Fedora 35 and
+     newer): `flick-<version>-linux-x86_64.tar.gz`. It uses the system's SDL2
+     (`libsdl2-2.0-0` on Debian and Ubuntu, `SDL2` on Fedora, `sdl2` on Arch) and, for the
+     file dialogs, `zenity` or `kdialog`; with neither, start it once with
+     `./flick --bios /path/to/hyperscan.bin` and drop discs on the window.
 2. You need the **HyperScan BIOS**, `hyperscan.bin` (the console's 1 MB flash, the same
    file as in MAME's `hyprscan` set), and the **game discs** as `.cue`/`.bin` or `.iso`
    images. Flick includes neither: dump your own.
-3. Double-click `flick.exe`. The first time it asks for the BIOS; then it offers a disc.
+3. Start `flick.exe` (or `flick` on Linux). The first time it asks for the BIOS; then it
+   offers a disc.
    You can also open a `.cue` with Flick, or drop it on the window.
 
 ## Playing
@@ -59,8 +66,8 @@ search). Enter puts the selected card on the reader, **F2** takes it off. A card
 the reader until F2, as if the player left it there.
 
 All 445 known cards are in the panel. When a game writes to a card (X-Men saves a
-character's experience), the card is saved in `cards/` next to the
-executable and used again the next time it is placed.
+character's experience), the card is saved in `cards/` (see
+[Settings](#settings)) and used again the next time it is placed.
 
 With two players, take each card off (F2) once the game has read it, before the other
 player places theirs: a game that reads quickly, such as Ben 10, would otherwise read the
@@ -79,7 +86,7 @@ Moving the mouse shows a toolbar along the top of the window; it hides after a f
 | reset | F5 | restart the console (the disc and the card stay) |
 | FAST / MAME | F3 | timing preset (see [How it works](#how-it-works)) |
 | controller | F4 | the controls panel |
-| camera | F12 | screenshot, in `screenshots/` next to the executable |
+| camera | F12 | screenshot, in `screenshots/` (see [Settings](#settings)) |
 | | Ctrl+F12 | debug dump in `debug/` (RAM, video state, frame): attach it when reporting a graphics glitch |
 | 1x / 2x | | window size |
 | full screen | F11, Alt+Enter | full screen and back (Esc also leaves it) |
@@ -89,9 +96,14 @@ Esc quits. In the card and controls panels, a controller works too: d-pad, A, B.
 
 ### Settings
 
-`flick.ini`, next to the executable, keeps the BIOS, the folder of the last disc, the
-volume, the window size, the timing preset and the controls. Flick rewrites it when the
-window closes, with what was chosen in the window.
+`flick.ini` keeps the BIOS, the folder of the last disc, the volume, the window size, the
+timing preset and the controls. Flick rewrites it when the window closes, with what was
+chosen in the window.
+
+It lives next to the executable, together with `cards/`, `screenshots/` and `debug/`. On
+Linux that holds when Flick is unpacked in a folder you can write to; otherwise (installed
+system-wide, say) `flick.ini` goes in `~/.config/flick/` and the rest in
+`~/.local/share/flick/`.
 
 ## Known issues
 
@@ -139,7 +151,7 @@ the running list in [TODO.md](TODO.md).
 | `--cd FILE` | disc image: `.cue` with one BINARY file (MODE1/2352, MODE1/2048, AUDIO tracks) or `.iso` |
 | `--card FILE` | a 120-byte card image on the reader from the start |
 | `--card-at T:ID` | place catalogue card ID (e.g. `xmen001`) at T seconds |
-| `--cards-dir DIR` | where written cards are saved (default `cards/` next to the executable) |
+| `--cards-dir DIR` | where written cards are saved (default `cards/`, see [Settings](#settings)) |
 | `--headless` | no window, no sound |
 | `--seconds S`, `--frames N` | stop after S emulated seconds / N frames |
 | `--screenshot FILE` | save the last frame as PNG on exit |
@@ -169,10 +181,14 @@ Windows, with MSYS2's mingw64: packages `mingw-w64-x86_64-gcc`, `-cmake`, `-ninj
     cmake -S . -B build -G Ninja
     cmake --build build
 
-`tools/package_release.sh` makes `dist/flick-<version>-win64.zip` from a clean Release
-build; the version is the one in `CMakeLists.txt` (`-dev` in ordinary builds). The code is
-C99 with one GCC/Clang extension (`unsigned __int128`, for exact emulated time); other
-platforms should only need build tweaks.
+Linux: `build-essential` (or gcc), `cmake`, `pkg-config` and `libsdl2-dev`, then the same
+two `cmake` lines.
+
+`tools/package_release.sh` (Windows) and `tools/package_linux.sh` (Linux, WSL included)
+make the release packages in `dist/` from a clean Release build; the version is the one in
+`CMakeLists.txt` (`-dev` in ordinary builds). The code is C99 with one GCC/Clang extension
+(`unsigned __int128`, for exact emulated time). The Linux build boots the BIOS with an
+instruction trace identical to MAME's, as the Windows one does; macOS should need little more than a package, but is untested.
 
 ## Testing against MAME
 

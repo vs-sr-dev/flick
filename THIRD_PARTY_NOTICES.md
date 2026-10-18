@@ -55,7 +55,8 @@ BSD-3-Clause license text:
 
 The window, sound and controllers use **SDL2** (https://libsdl.org), under the **zlib**
 license. The source tree does not include it; the Windows package ships `SDL2.dll` as built
-by MSYS2 (mingw-w64-x86_64-SDL2), unmodified. The headless build needs nothing else.
+by MSYS2 (mingw-w64-x86_64-SDL2), unmodified; the Linux package uses the system's
+SDL2. The headless build needs nothing else.
 
     Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 

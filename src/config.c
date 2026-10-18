@@ -10,7 +10,7 @@ config g_config = { .volume = 100, .scale = 1, .fast = 1 };
 static void config_path(char *out, size_t n)
 {
 	char dir[1024];
-	os_exe_dir(dir, sizeof(dir));
+	os_config_dir(dir, sizeof(dir));
 	snprintf(out, n, "%s/flick.ini", dir);
 }
 

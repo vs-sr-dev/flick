@@ -53,6 +53,31 @@ FILE *os_fopen(const char *path, const char *mode)
 	return _wfopen(wp, wm);
 }
 
+int os_fseek(FILE *f, long long off, int whence)
+{
+	return _fseeki64(f, off, whence);
+}
+
+long long os_ftell(FILE *f)
+{
+	return _ftelli64(f);
+}
+
+void os_config_dir(char *out, size_t n)
+{
+	os_exe_dir(out, n);
+}
+
+void os_data_dir(char *out, size_t n)
+{
+	os_exe_dir(out, n);
+}
+
+int os_can_pick(void)
+{
+	return 1;
+}
+
 void os_exe_dir(char *out, size_t n)
 {
 	wchar_t p[WPATH];
@@ -127,9 +152,13 @@ int os_pick_file(struct SDL_Window *win, int kind, const char *dir, char *out, s
 	return out[0] != 0;
 }
 
+
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 void os_utf8_args(int *argc, char ***argv)
 {
@@ -141,20 +170,78 @@ FILE *os_fopen(const char *path, const char *mode)
 	return fopen(path, mode);
 }
 
+int os_fseek(FILE *f, long long off, int whence)
+{
+	return fseeko(f, (off_t)off, whence);    /* 64-bit off_t: _FILE_OFFSET_BITS=64 */
+}
+
+long long os_ftell(FILE *f)
+{
+	return (long long)ftello(f);
+}
+
 void os_exe_dir(char *out, size_t n)
 {
 	char p[4096];
-	const ssize_t l = readlink("/proc/self/exe", p, sizeof(p) - 1);
 	char *slash = NULL;
+#ifdef __APPLE__
+	char raw[4096];
+	uint32_t size = sizeof(raw);
+	if (_NSGetExecutablePath(raw, &size) == 0 && realpath(raw, p)) slash = strrchr(p, '/');
+#else
+	const ssize_t l = readlink("/proc/self/exe", p, sizeof(p) - 1);
 	if (l > 0) { p[l] = 0; slash = strrchr(p, '/'); }
+#endif
 	if (!slash) { snprintf(out, n, "."); return; }
 	*slash = 0;
 	snprintf(out, n, "%s", p);
 }
 
+/* every folder along path */
+static void mkdir_p(const char *path)
+{
+	char p[4096];
+	snprintf(p, sizeof(p), "%s", path);
+	for (char *c = p + 1; *c; c++)
+		if (*c == '/')
+		{
+			*c = 0;
+			mkdir(p, 0755);
+			*c = '/';
+		}
+	mkdir(p, 0755);
+}
+
+/* unpacked somewhere writable (not an AppImage, not installed): keep everything together */
+static int portable(char *dir, size_t n)
+{
+	os_exe_dir(dir, n);
+	return !getenv("APPIMAGE") && access(dir, W_OK) == 0;
+}
+
+/* $XDG_<var> or ~/<fallback>, then /flick */
+static void xdg_dir(char *out, size_t n, const char *var, const char *fallback)
+{
+	const char *x = getenv(var), *home = getenv("HOME");
+	if (x && *x) snprintf(out, n, "%s/flick", x);
+	else snprintf(out, n, "%s/%s/flick", home ? home : ".", fallback);
+	mkdir_p(out);
+}
+
+void os_config_dir(char *out, size_t n)
+{
+	if (!portable(out, n)) xdg_dir(out, n, "XDG_CONFIG_HOME", ".config");
+}
+
+void os_data_dir(char *out, size_t n)
+{
+	if (!portable(out, n)) xdg_dir(out, n, "XDG_DATA_HOME", ".local/share");
+}
+
+/* from a terminal stderr is a tty; started from a file manager it goes nowhere */
 int os_console_attach(void)
 {
-	return 1;
+	return isatty(STDERR_FILENO);
 }
 
 void os_mkdir(const char *path)
@@ -162,10 +249,59 @@ void os_mkdir(const char *path)
 	mkdir(path, 0755);
 }
 
-/* no native dialog here yet: discs are dropped on the window, the BIOS given with --bios */
+/* the file dialog of the desktop, through zenity (GNOME and most others) or kdialog (KDE) */
+static int picker(void)
+{
+	static int which = -1;
+	if (which < 0)
+		which = system("command -v zenity >/dev/null 2>&1") == 0 ? 1
+			: system("command -v kdialog >/dev/null 2>&1") == 0 ? 2 : 0;
+	return which;
+}
+
+int os_can_pick(void)
+{
+	return picker() != 0;
+}
+
+/* s between single quotes for the shell */
+static void quote(char *d, size_t n, const char *s)
+{
+	size_t k = 0;
+	d[k++] = '\'';
+	for (; *s && k + 6 < n; s++)
+	{
+		if (*s == '\'') { memcpy(d + k, "'\\''", 4); k += 4; }
+		else d[k++] = *s;
+	}
+	d[k++] = '\'';
+	d[k] = 0;
+}
+
 int os_pick_file(struct SDL_Window *win, int kind, const char *dir, char *out, size_t n)
 {
-	(void)win; (void)kind; (void)dir; (void)out; (void)n;
-	return 0;
+	(void)win;
+	const int bios = kind == OS_PICK_BIOS;
+	const char *home = getenv("HOME");
+	char start[2048], q[4200], cmd[4600];
+	out[0] = 0;
+	if (!picker()) return 0;
+	snprintf(start, sizeof(start), "%s/", dir && *dir ? dir : home ? home : ".");
+	quote(q, sizeof(q), start);
+	if (picker() == 1)
+		snprintf(cmd, sizeof(cmd), "zenity --file-selection --title=%s --filename=%s --file-filter=%s "
+			"--file-filter='All files | *' 2>/dev/null",
+			bios ? "'Choose the HyperScan BIOS (hyperscan.bin)'" : "'Open a HyperScan disc'", q,
+			bios ? "'HyperScan BIOS | *.bin *.BIN'" : "'HyperScan discs | *.cue *.iso *.CUE *.ISO'");
+	else
+		snprintf(cmd, sizeof(cmd), "kdialog --title %s --getopenfilename %s %s 2>/dev/null",
+			bios ? "'Choose the HyperScan BIOS (hyperscan.bin)'" : "'Open a HyperScan disc'", q,
+			bios ? "'*.bin *.BIN|HyperScan BIOS'" : "'*.cue *.iso *.CUE *.ISO|HyperScan discs'");
+	FILE *p = popen(cmd, "r");
+	if (!p) return 0;
+	if (!fgets(out, (int)n, p)) out[0] = 0;
+	const int rc = pclose(p);
+	out[strcspn(out, "\n")] = 0;
+	return rc == 0 && out[0] != 0;
 }
 #endif
