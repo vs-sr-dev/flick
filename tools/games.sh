@@ -1,12 +1,14 @@
-# Disc images used by the regression scripts (sourced). Override any of them in the
-# environment; a game whose image is missing is skipped.
+# Disc images used by the regression scripts (sourced). By default DISCS/<game>.cue, with
+# DISCS = discs/ in the repository (ignored by git); set DISCS, or any XM_CUE..., in the
+# environment or in tools/local.sh.
+DISCS=${DISCS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/discs}
 declare -A GAME_CUE=(
-  [xm]="${XM_CUE:-D:/Homebrew6/HyperScanEmu/discs/xm/xm.cue}"
-  [sm]="${SM_CUE:-D:/Homebrew2/hyperscan-emulator-master/ISO/Spider-Man/Spider-Man (USA).cue}"
-  [iwl]="${IWL_CUE:-D:/Homebrew2/hyperscan-emulator-master/ISO/IWL_USE2/IWL - Interstellar Wrestling League (USA) (USE2).cue}"
-  [mh]="${MH_CUE:-D:/Homebrew6/HyperScanEmu/discs/mh/mh.cue}"
-  [b10]="${B10_CUE:-J:/Users/utente/Downloads/roms/Ben 10 (USA) (USE2).cue}"
-  [xm2]="${XM2_CUE:-J:/Users/utente/Downloads/roms/X-Men (USA) (USE2).cue}"
+  [xm]="${XM_CUE:-$DISCS/xm.cue}"
+  [sm]="${SM_CUE:-$DISCS/sm.cue}"
+  [iwl]="${IWL_CUE:-$DISCS/iwl.cue}"
+  [mh]="${MH_CUE:-$DISCS/mh.cue}"
+  [b10]="${B10_CUE:-$DISCS/b10.cue}"
+  [xm2]="${XM2_CUE:-$DISCS/xm2.cue}"
 )
 # emulated seconds per game: past the BIOS boot and the first CD loads
 # (xm2 is the raw MODE1/2352 dump of the disc that xm has as a 2048-byte ISO)

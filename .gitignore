@@ -27,3 +27,4 @@ __pycache__/
 # Local tooling state
 .claude/
 flick.ini
+tools/local.sh

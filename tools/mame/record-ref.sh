@@ -3,10 +3,12 @@
 #   dumps/ref/bios-boot-72M.trace  first 72M instructions of the BIOS boot (no CD, no card),
 #                                  = exactly 4.000 s at MAME's flat CPI 6 (432M cycles)
 #   dumps/ref/bios-logo-4s.png     MAME's screen at 4.000 s (static HyperScan logo)
-# Env: MAME (fork binary), ROMPATH (MAME rompath containing hyprscan/). MAME is deterministic:
+# Env (or tools/local.sh): MAME (fork binary), ROMPATH (MAME rompath containing hyprscan/). MAME is deterministic:
 # two runs give byte-identical traces.
 set -e
-MAME=${MAME:-D:/Homebrew6/mame-hslba/hyprscan.exe}
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+[ -f "$ROOT/tools/local.sh" ] && source "$ROOT/tools/local.sh"
+: "${MAME:?set MAME to the MAME fork binary (hyprscan.exe), e.g. in tools/local.sh}"
 : "${ROMPATH:?set ROMPATH to the MAME rompath containing hyprscan/}"
 OUT=$(cd "$(dirname "$0")/../.." && pwd)/dumps/ref
 mkdir -p "$OUT" && cd "$OUT"

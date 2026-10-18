@@ -13,6 +13,7 @@
 #include "cdservo.h"
 #include "spu.h"
 #include "card.h"
+#include "os.h"
 
 int g_log_uart;
 volatile int g_quit;
@@ -21,7 +22,7 @@ static uint16_t s_gpio_out;
 
 int machine_load_bios(const char *path)
 {
-	FILE *f = fopen(path, "rb");
+	FILE *f = os_fopen(path, "rb");
 	if (!f) return 0;
 	size_t n = fread(g_flash, 1, FLASH_SIZE, f);
 	fclose(f);

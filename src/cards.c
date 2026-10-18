@@ -4,15 +4,9 @@
  * game writes to a card (progress, unlocks), the card is saved as <dir>/<id>.bin and that
  * file is used the next time the card is placed on the reader. */
 #include <string.h>
-#include <sys/stat.h>
 #include "cards.h"
 #include "card.h"
-#ifdef _WIN32
-#include <direct.h>
-#define mkdir_p(d) _mkdir(d)
-#else
-#define mkdir_p(d) mkdir(d, 0755)
-#endif
+#include "os.h"
 
 static char s_dir[1024] = "cards";
 static const card_info *s_current;
@@ -55,7 +49,7 @@ void cards_insert(const card_info *c)
 	char path[1200];
 	snprintf(path, sizeof(path), "%s/%s.bin", s_dir, c->id);
 
-	FILE *f = fopen(path, "rb");
+	FILE *f = os_fopen(path, "rb");
 	if (!f || fread(img, 1, CARD_SIZE, f) != CARD_SIZE)
 	{
 		const int gid = s_games[c->game].gid, be = s_games[c->game].be;
@@ -65,7 +59,7 @@ void cards_insert(const card_info *c)
 	}
 	if (f) fclose(f);
 
-	mkdir_p(s_dir);                            /* so that a write can be saved */
+	os_mkdir(s_dir);                            /* so that a write can be saved */
 	card_insert(img, path);
 	s_current = c;
 }

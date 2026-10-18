@@ -1,0 +1,16 @@
+# Copy to tools/local.sh (ignored by git): the scripts in tools/ source it if it exists.
+# Anything set here can also come from the environment.
+BIOS=/path/to/hyperscan.bin                  # HyperScan flash, 1 MB (as MAME's hyprscan set)
+#ROMPATH=/path/to/roms                       # MAME rompath holding hyprscan/ (tools/mame, tools/recon)
+#MAME=/path/to/mame-fork/hyprscan.exe        # the MAME fork built with tools/mame/recon.patch
+#PY=/c/Python314/python.exe                  # a Python with Pillow (m1check, mkicon)
+
+# disc images for the regression (tools/games.sh): a folder with xm.cue, sm.cue, ...
+#DISCS=/path/to/discs
+# or one by one
+#XM_CUE="/path/to/X-Men.cue"
+#XM2_CUE="/path/to/X-Men (USA) (USE2).cue"
+#SM_CUE="/path/to/Spider-Man (USA).cue"
+#IWL_CUE="/path/to/IWL - Interstellar Wrestling League (USA) (USE2).cue"
+#MH_CUE="/path/to/Marvel Heroes (USA) (USE2).cue"
+#B10_CUE="/path/to/Ben 10 (USA) (USE2).cue"

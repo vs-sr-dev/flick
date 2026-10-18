@@ -1,6 +1,7 @@
 import pycdlib, os, sys
-src = r"D:/Homebrew2/hyperscan-emulator-master/ISO/XM_V1_0_USE"
-out = sys.argv[1]
+# argv[1]: the extracted X-Men disc (XM_V1_0_USE), argv[2]: the ISO to write
+src = sys.argv[1]
+out = sys.argv[2]
 p = pycdlib.PyCdlib()
 p.new(interchange_level=3, joliet=3, vol_ident="XM_V1_0_USE")
 # data first, HYPER.EXE last (IWL's layout puts it at the end)

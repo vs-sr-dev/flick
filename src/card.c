@@ -9,6 +9,7 @@
 #include <string.h>
 #include "card.h"
 #include "sched.h"
+#include "os.h"
 
 static int s_loaded;
 static uint8_t m_memory[CARD_SIZE];
@@ -17,7 +18,7 @@ static char s_save_path[1024];          /* where card writes go ("" = memory onl
 static void save_card(void)
 {
 	if (!s_save_path[0]) return;
-	FILE *f = fopen(s_save_path, "wb");
+	FILE *f = os_fopen(s_save_path, "wb");
 	if (!f) { hs_log("card: cannot write %s\n", s_save_path); return; }
 	fwrite(m_memory, 1, CARD_SIZE, f);
 	fclose(f);
@@ -77,7 +78,7 @@ void card_report(FILE *f)
 
 int card_load(const char *path)
 {
-	FILE *f = fopen(path, "rb");
+	FILE *f = os_fopen(path, "rb");
 	if (!f) return 0;
 	size_t n = fread(m_memory, 1, CARD_SIZE, f);
 	fclose(f);
@@ -217,7 +218,7 @@ void card_write(int state)
 	{
 		s_log_init = 1;
 		const char *p = getenv("HS_CARD_LOG");
-		if (p) s_log = fopen(p, "w");
+		if (p) s_log = os_fopen(p, "w");
 	}
 	if (s_log) fprintf(s_log, "%d %d %d\n", state, clk, s_loaded);
 

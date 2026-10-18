@@ -1,8 +1,10 @@
 #!/bin/bash
 # run.sh <name> <cue> <card> <seconds> [extra mame args...]
-# Env: SCR (work dir; recon.lua is taken from here), MAME (fork binary), ROMPATH (holds hyprscan/)
+# Env (or tools/local.sh): SCR (work dir; recon.lua is taken from here), MAME (fork binary), ROMPATH (holds hyprscan/)
 SCR=${SCR:-$(cd "$(dirname "$0")" && pwd)}
-MAME=${MAME:-D:/Homebrew6/mame-hslba/hyprscan.exe}
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+[ -f "$ROOT/tools/local.sh" ] && source "$ROOT/tools/local.sh"
+: "${MAME:?set MAME to the MAME fork binary (hyprscan.exe), e.g. in tools/local.sh}"
 : "${ROMPATH:?set ROMPATH to the MAME rompath containing hyprscan/}"
 name=$1; cue=$2; card=$3; secs=$4; shift 4
 D="$SCR/runs/$name"; rm -rf "$D"; mkdir -p "$D"; cd "$D"

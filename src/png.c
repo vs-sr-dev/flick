@@ -1,6 +1,7 @@
 /* Flick - minimal PNG writer (RGB8, uncompressed deflate blocks, no dependencies) */
 #include <stdlib.h>
 #include "png.h"
+#include "os.h"
 
 static uint32_t crc_table[256];
 
@@ -35,7 +36,7 @@ static void chunk(FILE *f, const char *type, const uint8_t *data, uint32_t len)
 
 int png_write(const char *path, const uint32_t *pixels, int stride, int w, int h)
 {
-	FILE *f = fopen(path, "wb");
+	FILE *f = os_fopen(path, "wb");
 	if (!f) return 0;
 	static const uint8_t sig[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
 	fwrite(sig, 1, 8, f);

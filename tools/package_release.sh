@@ -4,10 +4,11 @@
 # Needs MSYS2 mingw64 (gcc, cmake, ninja, SDL2) and a Python (only its zipfile module).
 # Refuses to package uncommitted changes unless ALLOW_DIRTY=1.
 set -e
+[ -f "$(dirname "$0")/local.sh" ] && source "$(dirname "$0")/local.sh"
 PY=${PY:-$(command -v python)}      # resolve before mingw64 joins PATH
 cd "$(dirname "$0")/.."
 export PATH=/c/msys64/mingw64/bin:$PATH
-MINGW=/c/msys64/mingw64
+MINGW=${MINGW:-/c/msys64/mingw64}
 
 if [ -n "$(git status --porcelain)" ] && [ "${ALLOW_DIRTY:-0}" != 1 ]; then
   echo "uncommitted changes: commit them first (or ALLOW_DIRTY=1)" >&2

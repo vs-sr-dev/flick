@@ -4,6 +4,7 @@
 #include <string.h>
 #include "trace.h"
 #include "score7.h"
+#include "os.h"
 
 FILE *g_trace;
 int g_trace_done;
@@ -29,7 +30,7 @@ int trace_open(const char *spec)
 		if (*e == ':') s_from = strtoull(e + 1, &e, 0);
 		*c = 0;
 	}
-	g_trace = fopen(path, "w");
+	g_trace = os_fopen(path, "w");
 	if (!g_trace) return 0;
 	setvbuf(g_trace, NULL, _IOFBF, 1 << 22);
 	fprintf(g_trace, "# hstrace 1\n");

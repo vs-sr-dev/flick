@@ -3,8 +3,17 @@
 #define HS_OS_H
 
 #include <stddef.h>
+#include <stdio.h>
 
 struct SDL_Window;
+
+/* Paths are UTF-8 everywhere in Flick (SDL hands dropped files over in UTF-8); on Windows
+ * these go through the wide-character API so that any file name works. */
+
+/* replace argv with UTF-8 copies of the command line's arguments (Windows; else no-op) */
+void os_utf8_args(int *argc, char ***argv);
+/* fopen for a UTF-8 path */
+FILE *os_fopen(const char *path, const char *mode);
 
 /* folder of the executable, without a trailing separator ("." if unknown) */
 void os_exe_dir(char *out, size_t n);

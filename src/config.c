@@ -32,7 +32,7 @@ int config_load(void)
 {
 	char path[1100], line[1200];
 	config_path(path, sizeof(path));
-	FILE *f = fopen(path, "r");
+	FILE *f = os_fopen(path, "r");
 	if (!f) return 0;
 	while (fgets(line, sizeof(line), f))
 	{
@@ -58,7 +58,7 @@ int config_save(void)
 {
 	char path[1100];
 	config_path(path, sizeof(path));
-	FILE *f = fopen(path, "w");
+	FILE *f = os_fopen(path, "w");
 	if (!f) return 0;
 	fprintf(f, "# Flick settings, rewritten on exit\n");
 	fprintf(f, "bios = %s\n", g_config.bios);

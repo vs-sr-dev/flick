@@ -25,7 +25,7 @@ if(WIN32)
   set(FLICK_ICON "${CMAKE_SOURCE_DIR}/res/flick.ico")
   configure_file(res/flick.rc.in "${CMAKE_BINARY_DIR}/flick.rc" @ONLY)
   target_sources(flick PRIVATE "${CMAKE_BINARY_DIR}/flick.rc")
-  target_link_libraries(flick PRIVATE comdlg32)   # the "open a disc" dialog
+  target_link_libraries(flick PRIVATE comdlg32 shell32)   # file dialogs, UTF-16 command line
 endif()
 
 if(HS_SDL)

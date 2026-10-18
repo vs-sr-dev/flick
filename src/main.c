@@ -268,7 +268,7 @@ static void open_disc(SDL_Window *win, const char *path)
 #ifdef _WIN32
 static long file_size(const char *path)
 {
-	FILE *f = fopen(path, "rb");
+	FILE *f = os_fopen(path, "rb");
 	if (!f) return -1;
 	fseek(f, 0, SEEK_END);
 	const long n = ftell(f);
@@ -319,7 +319,7 @@ static void screenshot(void)
 		if (n == 1) snprintf(name, sizeof(name), "hyperscan-%s.png", stamp);
 		else snprintf(name, sizeof(name), "hyperscan-%s-%d.png", stamp, n);
 		snprintf(path, sizeof(path), "%s/screenshots/%s", dir, name);
-		FILE *f = fopen(path, "rb");
+		FILE *f = os_fopen(path, "rb");
 		if (!f) break;
 		fclose(f);
 	}
@@ -814,6 +814,7 @@ int main(int argc, char **argv)
 	double seconds = 0;
 	uint64_t frames = 0;
 	const int console = os_console_attach();
+	os_utf8_args(&argc, &argv);                 /* paths are UTF-8 from here on */
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -935,7 +936,7 @@ int main(int argc, char **argv)
 
 	if (wav)
 	{
-		if (!(s_wav = fopen(wav, "wb")))
+		if (!(s_wav = os_fopen(wav, "wb")))
 		{
 			report("cannot write %s", wav);
 			return 1;

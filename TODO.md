@@ -52,9 +52,11 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       LICENSE-SDL2.txt); versione da `project(VERSION)` in CMake (`-dev` nelle build normali),
       `--version` e proprietà del file. Primo pacchetto preparato il 2026-10-18 (WIP).
 - [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
-- [ ] `tools/games.sh` punta a percorsi di questa macchina (`D:`, `J:`): renderli relativi o
-      configurabili prima di pubblicare.
-- [ ] Percorsi non ASCII: i file trascinati arrivano in UTF-8, `fopen` vuole ANSI.
+- [x] Percorsi di questa macchina fuori dagli script: `tools/local.sh` (ignorato da git,
+      modello in `tools/local.sh.example`) con BIOS, ROMPATH, MAME, PY e dischi; `games.sh`
+      cerca `discs/<gioco>.cue` per default.
+- [x] Percorsi non ASCII: tutto UTF-8 dentro, API wide su Windows (argv, `os_fopen`,
+      `os_mkdir`, dialoghi, cartella dell'exe); provato con `Prova àè ñ 日本`.
 
 ### 2. Frontend
 - [ ] Filtro TV: l'HyperScan esce solo in composito, che fonde il dithering dei giochi

@@ -1,159 +1,198 @@
+<p align="center"><img src="res/flick.png" width="160" alt="Flick"></p>
+
 # Flick
 
-An emulator for the **Mattel HyperScan** (2006), the Sunplus SPG290-based console that
-reads game discs and RFID character cards. Work in progress. The name is the flick of the
-wrist that puts a card on the scanner.
+An emulator for the **Mattel HyperScan** (2006), the Sunplus SPG290 console that reads
+game discs and RFID character cards. It runs the five retail games with sound, cards and
+two players. The name is the flick of the wrist that puts a card on the scanner.
 
-The goal is an emulator that runs the retail games at the right speed with sound. MAME's
-`hyprscan` driver is the starting point and the reference. Its CPU and video code is ported
-here under BSD-3-Clause (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)), and every
-step is checked against an instruction trace of MAME before any deliberate change.
+**Work in progress.** Flick is built on MAME's `hyprscan` driver, which it follows cycle
+for cycle where MAME is right, and goes further where MAME stops: sound, the card reader at
+full speed, the games' real frame rate. It is an independent project, not affiliated with
+Mattel or Sunplus.
 
-## Status
+## Games
 
-**M1 (done):** S+core 7 CPU, memory map, timers, I2C with controllers, PPU and TV timing.
-The original BIOS boots to the HyperScan logo. The first 72 million instructions (4 emulated
-seconds) match MAME's trace exactly, down to the cycle of every interrupt, and the screen at
-4.000 s is pixel-identical to MAME's.
+| Game | |
+|-|-|
+| X-Men | playable with cards; the experience a character gains is saved on its card |
+| Marvel Heroes | playable with cards, one or two players |
+| Ben 10 | playable with cards, one or two players (about two minutes of loading at boot) |
+| IWL - Interstellar Wrestling League | playable with cards; some of the sound is missing (see [Known issues](#known-issues)) |
+| Spider-Man | reaches gameplay; not tried with cards yet |
 
-**M2 (in progress):** CD servo and disc images, SPU (sound, the DAC FIFO used by the games
-and the 24 hardware voices). All five retail games (X-Men, Spider-Man, Marvel Heroes, IWL,
-Ben 10) boot from their discs through the BIOS and reach gameplay. X-Men, Marvel Heroes,
-Ben 10 and IWL have been played with cards, Marvel Heroes and Ben 10 also by two players.
-Over the first 60-120 seconds of each, every I/O access and interrupt matches MAME's, and a
-hash of all registers taken every 100 000 instructions matches too. The RFID card reader
-works, and the cards the games write are saved: X-Men keeps a character's experience on
-the card. Not yet: save states, a disassembler for traces.
+## Getting started
 
-Later milestones: a timing model fitted to captures from real hardware, since MAME's flat
-6 cycles per instruction makes the heavy games run at half speed (M4); a boot without the
-BIOS (M5). The analysis behind this plan is in [RECON.md](RECON.md).
+1. Download `flick-<version>-win64.zip` from [Releases](https://github.com/vs-sr-dev/flick/releases)
+   and extract it anywhere (Windows, 64-bit).
+2. You need the **HyperScan BIOS**, `hyperscan.bin` (the console's 1 MB flash, the same
+   file as in MAME's `hyprscan` set), and the **game discs** as `.cue`/`.bin` or `.iso`
+   images. Flick includes neither: dump your own.
+3. Double-click `flick.exe`. The first time it asks for the BIOS; then it offers a disc.
+   You can also open a `.cue` with Flick, or drop it on the window.
 
-### Known issues
+## Playing
 
-- **IWL: sound missing in places.** IWL - Interstellar Wrestling League plays its sound
-  through a different path from the other four games, and parts of it are silent. This is
-  expected for now: an earlier experimental SPU patch for MAME had the same result (the
-  other games played, IWL did not).
+### Controls
 
-## Legal
+| HyperScan | Keyboard | Controller (Xbox layout) |
+|-|-|-|
+| stick | arrows | left stick, d-pad |
+| green, red, yellow, blue | Z, X, C, V | A, B, Y, X |
+| start, select | Enter, Backspace | Menu, View |
+| shoulders | A, S | LB, RB |
+| triggers | Q, W | LT, RT |
 
-This repository contains **no** BIOS, game code or disc data. You need your own dump of
-the HyperScan flash (`hyperscan.bin`, 1 MB, the same file MAME uses). Flick is an
-independent project, not affiliated with Mattel or Sunplus.
+These are the defaults: the **controls panel** (F4, or the controller button on the
+toolbar) changes them. Click a cell (or Enter), then press the new key or button; one that
+is already in use swaps places, Del clears one.
 
-## Usage
+Any game controller SDL knows (Xbox, PlayStation and many others) works. The first one
+plugged in is player 1, the second player 2. The keyboard plays the first player without a
+controller, so one controller and the keyboard make two players.
 
-Start `flick` with no arguments (or double-click it). On the first start it asks for the
-BIOS; then it offers a disc. Opening a `.cue` or `.iso` with Flick, or dropping one on the
-executable, starts that disc directly. From a terminal:
+### Cards
 
-    flick game.cue                                         # window, sound, real time
-    flick --bios hyperscan.bin --headless --seconds 4 --screenshot logo.png
+The HyperScan's games come alive with cards placed on the scanner. **F1** opens the card
+panel, with the cards of the game in the drive (Tab shows the other games' cards; type to
+search). Enter puts the selected card on the reader, **F2** takes it off. A card stays on
+the reader until F2, as if the player left it there.
+
+All 445 known cards are in the panel. When a game writes to a card (X-Men saves a
+character's experience), the card is saved in `cards/` next to the
+executable and used again the next time it is placed.
+
+With two players, take each card off (F2) once the game has read it, before the other
+player places theirs: a game that reads quickly, such as Ben 10, would otherwise read the
+first card again and give both players the same character.
+
+### Toolbar and keys
+
+Moving the mouse shows a toolbar along the top of the window; it hides after a few seconds.
+
+| Button | Key | |
+|-|-|-|
+| disc | Ctrl+O | open a disc (or drop it on the window): the console restarts with it |
+| card | F1 | the card panel |
+| eject | F2 | take the card off the reader |
+| pause | P, Pause | pause and resume |
+| reset | F5 | restart the console (the disc and the card stay) |
+| FAST / MAME | F3 | timing preset (see [How it works](#how-it-works)) |
+| controller | F4 | the controls panel |
+| camera | F12 | screenshot, in `screenshots/` next to the executable |
+| | Ctrl+F12 | debug dump in `debug/` (RAM, video state, frame): attach it when reporting a graphics glitch |
+| 1x / 2x | | window size |
+| full screen | F11, Alt+Enter | full screen and back (Esc also leaves it) |
+| speaker, slider | | mute, volume (the mouse wheel works on them too) |
+
+Esc quits. In the card and controls panels, a controller works too: d-pad, A, B.
+
+### Settings
 
 `flick.ini`, next to the executable, keeps the BIOS, the folder of the last disc, the
-volume, the window scale and the timing preset chosen with F3. It is rewritten when the
-window closes, with only what was chosen in the window: command-line options are never
-saved. Runs with `--headless` read the BIOS from it but always start with the `fast` preset.
+volume, the window size, the timing preset and the controls. Flick rewrites it when the
+window closes, with what was chosen in the window.
 
-On Windows Flick is a GUI program: a double click opens no console window, and errors at
-start-up show in a message box. Started from a terminal it still prints there. cmd and
-PowerShell do not wait for GUI programs, so for headless runs from them use
-`start /wait flick ...` or redirect the output (`flick ... 2>&1 | Out-Host`); bash waits as
-usual.
+## Known issues
+
+- **IWL: some sound is missing.** IWL plays its sound through a different path from the
+  other four games, and parts of it are silent. An earlier experimental sound patch for
+  MAME had the same result: the other games played, IWL did not.
+- **Loading times** follow MAME's CD drive, which answers instantly; the real console
+  takes longer to seek. Fitting them to the hardware is still to do.
+- On a slow PC a few stretches of IWL (loading, decompression) may not hold full speed.
+- No save states yet.
+
+## How it works
+
+Flick is written in C. Its CPU (S+core 7), video, timers, controllers, CD drive and card
+reader start as ports of MAME's code, and every step is checked against instruction traces
+of a MAME build: the BIOS boot is identical to MAME's for its first 72 million
+instructions, down to the cycle of every interrupt, with a pixel-identical logo, and the
+first 60-120 seconds of each game match MAME's I/O accesses, interrupts and registers.
+
+Then it departs from MAME where MAME is wrong for playing:
+
+- **Sound.** MAME's driver has none; Flick emulates the SPG290's sound unit (24 hardware
+  voices with PCM and ADPCM, and the DAC FIFO the games stream sound through), including
+  the BIOS boot jingle.
+- **Speed.** MAME charges every instruction 6 cycles, so X-Men fights at 15 fps. Flick's
+  default `fast` preset charges 1 and keeps MAME's vblank per frame: X-Men fights at 30 fps,
+  as on captures from real consoles. It decodes the card reader's pulses by their ratios
+  (MAME's fixed widths only work at 6 cycles per instruction), and skips the games' waiting
+  loops exactly: whole iterations, never past the next event, so nothing changes but the
+  time it takes the host. **F3** (`--timing mame`) switches to MAME's timing, cycle for cycle.
+- **Video.** The 640x240 mode starts 8 lines into the layers, which makes Ben 10's split
+  screen clean.
+
+The milestones ahead: a timing model fitted to the real console (loading times, CD seeks),
+then a boot without the BIOS. The original analysis is in [RECON.md](RECON.md) (in Italian),
+the running list in [TODO.md](TODO.md).
+
+## Command line
+
+    flick [options] [disc.cue|disc.iso]
 
 | Option | |
 |-|-|
 | `--bios FILE` | HyperScan flash image (default: the one in `flick.ini`) |
 | `--cd FILE` | disc image: `.cue` with one BINARY file (MODE1/2352, MODE1/2048, AUDIO tracks) or `.iso` |
-| `--headless` | no window |
+| `--card FILE` | a 120-byte card image on the reader from the start |
+| `--card-at T:ID` | place catalogue card ID (e.g. `xmen001`) at T seconds |
+| `--cards-dir DIR` | where written cards are saved (default `cards/` next to the executable) |
+| `--headless` | no window, no sound |
 | `--seconds S`, `--frames N` | stop after S emulated seconds / N frames |
 | `--screenshot FILE` | save the last frame as PNG on exit |
-| `--wav FILE` | record the sound output as a WAV file (window or headless) |
-| `--debug-dump DIR` | on exit, save the frame's video state and RAM (as Ctrl+F12 does in the window) |
-| `--render-dump DIR` | render such a dump again into `DIR/render.png` (or `--screenshot FILE`); no BIOS needed |
-| `--trace FILE[:N[:K[:FROM]]]` | trace the first N instructions (default 50M), same format as the MAME fork; with K > 0 a sparse trace (I/O, interrupts, a register hash every K instructions, full lines from FROM on) |
-| `--input SPEC` | scripted presses, `T:button[:dur][@pad],...` with times in seconds |
-| `--timing fast\|mame` | timing model (default `fast`, see below); `--trace` forces `mame` |
+| `--wav FILE` | record the sound output as WAV |
+| `--debug-dump DIR` | on exit, save the frame's video state and RAM (as Ctrl+F12) |
+| `--render-dump DIR` | render such a dump again into `DIR/render.png`; no BIOS needed |
+| `--trace FILE[:N[:K[:FROM]]]` | trace the first N instructions (default 50M) in the MAME fork's format; K > 0: sparse (I/O, interrupts, a register hash every K instructions, full lines from FROM on) |
+| `--input SPEC` | scripted presses, `T:button[:dur][@pad],...` (seconds) |
+| `--timing fast\|mame` | timing preset (default `fast`); `--trace` forces `mame` |
 | `--cpi N` | cycles per instruction, overriding the preset |
-| `--log-uart` | print the BIOS debug UART on stderr |
+| `--field-vblank` | a vblank per field in interlaced modes (MAME: per frame) |
+| `--log-uart` | print the BIOS debug UART |
 | `-v` | verbose log |
+| `--version` | print the version |
 
-Pad: arrows = stick, Z/X/C/V = green/red/yellow/blue, Enter = start, Backspace = select,
-A/S = shoulders, Q/W = triggers. These are the defaults: the controls panel (F4, or the
-controller button on the toolbar) changes the keyboard and controller bindings. Click a
-cell (or Enter) and press the new key or button; a key already in use swaps places, Del
-clears one. The bindings are kept in `flick.ini`.
+Headless runs read the BIOS from `flick.ini` but always start with the `fast` preset, and
+command-line options are never saved. On Windows Flick is a GUI program: started from a
+terminal it prints there, but cmd and PowerShell do not wait for it, so for headless runs
+use bash, `start /wait flick ...`, or a pipe (`flick ... 2>&1 | Out-Host`).
 
-Game controllers (anything SDL knows as a game controller, e.g. Xbox or PlayStation pads):
-the first one plugged in is player 1, the second player 2. The keyboard takes the first
-player without a controller: player 1 with none, player 2 with one (so a pad and the
-keyboard make two players), player 1 again, alongside the first pad, with two. On an Xbox pad the colours match: A green, B red, X blue, Y yellow; LB/RB are the
-shoulders, LT/RT the triggers, Menu is start, View is select, the left stick and the d-pad
-the stick. In the card panel the d-pad moves, LB/RB page, A places the card, B closes.
+## Building
 
-Moving the mouse shows a toolbar along the top of the window; it hides again after a few
-seconds. Its buttons, with their keys:
-
-| Button | Key | |
-|-|-|-|
-| disc | Ctrl+O | open a `.cue` or `.iso` (or drop it on the window): the console restarts with it |
-| card | F1 | the card panel: pick a card and put it on the reader |
-| eject | F2 | take the card off the reader |
-| pause | P, Pause | pause and resume |
-| reset | F5 | restart the console (the disc and the card stay) |
-| FAST / MAME | F3 | switch the timing preset (see below) |
-| controller | F4 | the controls panel (see above) |
-| camera | F12 | save a screenshot in `screenshots/` next to the executable |
-| | Ctrl+F12 | debug dump in `debug/` next to the executable: RAM, PPU and TV state, frame (for reporting graphics glitches) |
-| 1x / 2x | | window size |
-| full screen | F11, Alt+Enter | full screen and back (Esc also leaves it) |
-| speaker, slider | | mute, volume (the mouse wheel works on them too) |
-
-Esc quits. Cards that a game writes to are saved in `cards/` next to the executable
-(`--cards-dir` to change it).
-
-A card placed from the panel stays on the reader until F2 takes it off, as if the player
-left it there. With two players, take each card off (F2) once the game has read it, before
-the other player places theirs: a game that reads quickly, such as Ben 10, would otherwise
-read the first card again and give both players the same character.
-
-### Timing
-
-MAME charges 6 cycles to every instruction, so X-Men fights at 15 fps. The default `fast`
-preset charges 1 cycle per instruction and keeps MAME's PPU vblank per frame in the
-interlaced video modes: X-Men fights at 30 fps, as on captures from real consoles. It also
-decodes the card reader's pulses by their ratios rather than MAME's absolute widths, which
-only work at 6 cycles per instruction, and fast-forwards idle loops (exactly: whole
-iterations, never past the next event). It also plays the BIOS boot jingle, which MAME
-leaves silent: the BIOS starts the DAC FIFO before giving it a sample clock, and feeds it
-only while its frame loop waits for the vblank, which it never does when the controllers'
-I2C is clocked as in MAME (27 MHz); `fast` clocks it from the 108 MHz system clock.
-`--timing mame` (or F3 in the window) gives
-MAME's behaviour back, cycle for cycle. `--field-vblank` raises a vblank per field instead,
-which lets X-Men reach 60 fps: real captures say it does not. Fitting the rest of the
-timing (loading times, CD seeks) to the real console is milestone M4.
-
-## Build (Windows, MSYS2 mingw64)
-
-Packages: `mingw-w64-x86_64-gcc`, `-cmake`, `-ninja`, `-SDL2` (SDL2 is optional: without
-it the build is headless only).
+Windows, with MSYS2's mingw64: packages `mingw-w64-x86_64-gcc`, `-cmake`, `-ninja`,
+`-SDL2` (without SDL2 the build is headless only).
 
     export PATH=/c/msys64/mingw64/bin:$PATH
     cmake -S . -B build -G Ninja
     cmake --build build
 
-`tools/package_release.sh` makes the Windows package, `dist/flick-<version>-win64.zip`
-(a clean Release build with `flick.exe`, `SDL2.dll`, this README and the licences); the
-version is the one in `CMakeLists.txt`, `-dev` in ordinary builds.
-
-The code is C99 with one GCC/Clang extension (`unsigned __int128` for exact emulated
-time). Other platforms should only need build tweaks.
+`tools/package_release.sh` makes `dist/flick-<version>-win64.zip` from a clean Release
+build; the version is the one in `CMakeLists.txt` (`-dev` in ordinary builds). The code is
+C99 with one GCC/Clang extension (`unsigned __int128`, for exact emulated time); other
+platforms should only need build tweaks.
 
 ## Testing against MAME
 
-[tools/mame/](tools/mame/) holds the patch for a MAME fork that writes the reference
-trace (`HS_TRACE`). `record-ref.sh` records the BIOS boot reference and `record-games.sh`
-sparse references for the games listed in `tools/games.sh`. `tools/regress.sh` compares
-Flick with all of them; `tools/tracediff.sh` shows the first divergence between two
-traces, with context.
+[tools/mame/](tools/mame/) holds the patch for the MAME fork that writes reference traces
+(`HS_TRACE`). `record-ref.sh` records the BIOS boot, `record-games.sh` sparse references
+for the games in `tools/games.sh`; `tools/regress.sh` compares Flick with all of them and
+`tools/tracediff.sh` shows the first divergence between two traces. The scripts take the
+BIOS, the disc images and the MAME binary from the environment or from `tools/local.sh`
+(copy [tools/local.sh.example](tools/local.sh.example)).
+
+## License
+
+Flick is under the [MIT License](LICENSE). The files ported from MAME keep their
+BSD-3-Clause license, the card catalogue comes from MAME's CC0 software list, and the
+Windows package includes SDL2 (zlib license): see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+This repository contains no BIOS, game code or disc data.
+
+## Thanks
+
+To Sandro Ronco and the MAME team for the `hyprscan` driver and the SPG290 devices this
+emulator grew from, and to everyone who dumped and documented the HyperScan.

@@ -4,10 +4,12 @@
 #     (tools/m1check.sh, references from tools/mame/record-ref.sh)
 #   - games: sparse traces of each game in tools/games.sh
 #     (references from tools/mame/record-games.sh)
-# Env: BIOS (hyperscan.bin). Needs build/flick.exe.
+# Env (or tools/local.sh): BIOS (hyperscan.bin), disc paths (see tools/games.sh). Needs build/flick.exe.
 set -e
-: "${BIOS:?set BIOS to the HyperScan flash image (hyperscan.bin)}"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+[ -f "$ROOT/tools/local.sh" ] && source "$ROOT/tools/local.sh"
+: "${BIOS:?set BIOS to the HyperScan flash image (hyperscan.bin), e.g. in tools/local.sh}"
+export BIOS PY
 source "$ROOT/tools/games.sh"
 bash "$ROOT/tools/m1check.sh"
 export PATH=/c/msys64/mingw64/bin:$PATH

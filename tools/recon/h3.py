@@ -1,5 +1,6 @@
-import re, collections
-H = "D:/Homebrew2/hyperscan-emulator-master/PPCSDK/HyperScan-SPG29x-SDK-main/SPG290/scorelibs/include/SPG290_Registers.h"
+import re, collections, sys
+# argv[1]: SPG290_Registers.h from the HyperScan SDK (SPG290/scorelibs/include)
+H = sys.argv[1]
 names = {}
 for l in open(H, encoding="latin1"):
     m = re.match(r"#define\s+(\w+)\s+\(UV32\s*\*\)\s*0x([0-9A-Fa-f]{8})", l)

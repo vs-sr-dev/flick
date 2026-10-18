@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cdimg.h"
+#include "os.h"
 
 uint32_t cdimg_lba_to_msf(uint32_t lba)
 {
@@ -48,7 +49,7 @@ static void finish_toc(cdimg *cd)
 
 static cdimg *open_cue(const char *path)
 {
-	FILE *cue = fopen(path, "r");
+	FILE *cue = os_fopen(path, "r");
 	if (!cue) return NULL;
 	cdimg *cd = calloc(1, sizeof(*cd));
 	char line[1024], bin[1024] = "";
@@ -94,7 +95,7 @@ static cdimg *open_cue(const char *path)
 		}
 	}
 	fclose(cue);
-	if (!ok || !cd->numtrks || !bin[0] || !(cd->f = fopen(bin, "rb")))
+	if (!ok || !cd->numtrks || !bin[0] || !(cd->f = os_fopen(bin, "rb")))
 	{
 		free(cd);
 		return NULL;
@@ -119,7 +120,7 @@ cdimg *cdimg_open(const char *path)
 	if (ends_with(path, ".iso"))
 	{
 		cdimg *cd = calloc(1, sizeof(*cd));
-		if (!(cd->f = fopen(path, "rb"))) { free(cd); return NULL; }
+		if (!(cd->f = os_fopen(path, "rb"))) { free(cd); return NULL; }
 		cd->numtrks = 1;
 		cd->tracks[0].type = CDT_MODE1;
 		cd->tracks[0].datasize = 2048;
