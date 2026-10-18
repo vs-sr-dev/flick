@@ -143,6 +143,10 @@ it the build is headless only).
     cmake -S . -B build -G Ninja
     cmake --build build
 
+`tools/package_release.sh` makes the Windows package, `dist/flick-<version>-win64.zip`
+(a clean Release build with `flick.exe`, `SDL2.dll`, this README and the licences); the
+version is the one in `CMakeLists.txt`, `-dev` in ordinary builds.
+
 The code is C99 with one GCC/Clang extension (`unsigned __int128` for exact emulated
 time). Other platforms should only need build tweaks.
 

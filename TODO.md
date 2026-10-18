@@ -47,8 +47,10 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [x] Applicazione GUI su Windows (scelta dell'utente): niente finestra del prompt col doppio
       clic; da terminale `AttachConsole`, errori di avvio e fatali anche in un message box.
       cmd/PowerShell non aspettano la fine (bash sì): vedi README.
-- [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
-      THIRD_PARTY_NOTICES; script `tools/package_release.sh`; versione nel binario.
+- [x] Pacchetto Windows: `tools/package_release.sh` -> `dist/flick-0.1.0-win64.zip` (exe,
+      `SDL2.dll`, README, LICENSE, THIRD_PARTY_NOTICES con la licenza zlib di SDL2,
+      LICENSE-SDL2.txt); versione da `project(VERSION)` in CMake (`-dev` nelle build normali),
+      `--version` e proprietà del file. Primo pacchetto preparato il 2026-10-18 (WIP).
 - [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
 - [ ] `tools/games.sh` punta a percorsi di questa macchina (`D:`, `J:`): renderli relativi o
       configurabili prima di pubblicare.

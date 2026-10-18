@@ -26,7 +26,9 @@
 #include "controls.h"
 #endif
 
-#define HS_VERSION "0.1.0-dev"
+#ifndef HS_VERSION                  /* set by CMake from project(VERSION) */
+#define HS_VERSION "unknown"
+#endif
 
 int g_verbose;
 static int s_error_box;              /* errors also in a message box: a window and no console */
@@ -100,7 +102,8 @@ static void usage(void)
 		"  --field-vblank     PPU vblank per field in interlaced modes (MAME: per frame)\n"
 		"  --mark PC          -v: count passes through PC (hex) per second\n"
 		"  --log-uart         print the BIOS debug UART on stderr\n"
-		"  -v                 verbose log\n");
+		"  -v                 verbose log\n"
+		"  --version          print the version and exit\n");
 	exit(2);
 }
 
@@ -859,6 +862,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--input")) { if (!input_script_parse(NEXT())) usage(); }
 		else if (!strcmp(a, "--log-uart")) g_log_uart = 1;
 		else if (!strcmp(a, "-v")) g_verbose = 1;
+		else if (!strcmp(a, "--version")) { printf("Flick %s\n", HS_VERSION); return 0; }
 		else if (a[0] != '-' && !cdpath) cdpath = a;     /* "Open with", a disc dropped on the exe */
 		else usage();
 	}

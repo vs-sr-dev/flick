@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(flick C)
+project(flick VERSION 0.1.0 LANGUAGES C)
+
+# the version in the binary: 0.1.0-dev while developing, 0.1.0 in the release package
+# (tools/package_release.sh sets the suffix to empty)
+set(FLICK_VERSION_SUFFIX "-dev" CACHE STRING "Appended to the version number")
+set(FLICK_VERSION "${PROJECT_VERSION}${FLICK_VERSION_SUFFIX}")
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_EXTENSIONS ON)       # unsigned __int128 for exact emulated time
@@ -12,10 +17,14 @@ option(HS_SDL "Build the SDL2 frontend (window, input)" ON)
 add_executable(flick
   src/main.c src/machine.c src/bus.c src/sched.c src/score7.c src/trace.c
   src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c src/cards.c src/cardlist.c src/font.c src/ui.c src/toolbar.c src/os.c src/dump.c src/config.c src/controls.c)
+target_compile_definitions(flick PRIVATE HS_VERSION="${FLICK_VERSION}")
 target_compile_options(flick PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-type-limits)
 if(WIN32)
   enable_language(RC)
-  target_sources(flick PRIVATE res/flick.rc)      # the icon (res/flick.ico, from tools/mkicon.py)
+  # icon (res/flick.ico, made by tools/mkicon.py) and version information
+  set(FLICK_ICON "${CMAKE_SOURCE_DIR}/res/flick.ico")
+  configure_file(res/flick.rc.in "${CMAKE_BINARY_DIR}/flick.rc" @ONLY)
+  target_sources(flick PRIVATE "${CMAKE_BINARY_DIR}/flick.rc")
   target_link_libraries(flick PRIVATE comdlg32)   # the "open a disc" dialog
 endif()
 
