@@ -51,7 +51,11 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       `SDL2.dll`, README, LICENSE, THIRD_PARTY_NOTICES con la licenza zlib di SDL2,
       LICENSE-SDL2.txt); versione da `project(VERSION)` in CMake (`-dev` nelle build normali),
       `--version` e proprietà del file. Primo pacchetto preparato il 2026-10-18 (WIP).
-- [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
+- [x] Repository pubblico https://github.com/vs-sr-dev/flick e pre-release **v0.1.0**
+      (2026-10-18, `0c8959e`, zip da `tools/package_release.sh`, SHA-256 nelle note).
+- [ ] Screenshot nel README, con un disclaimer sui contenuti di proprietà dei rispettivi
+      titolari (decisione dell'utente: più avanti).
+- [ ] Release automatica da GitHub Actions (MSYS2) al push di un tag: per ora a mano.
 - [x] Percorsi di questa macchina fuori dagli script: `tools/local.sh` (ignorato da git,
       modello in `tools/local.sh.example`) con BIOS, ROMPATH, MAME, PY e dischi; `games.sh`
       cerca `discs/<gioco>.cue` per default.
