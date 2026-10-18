@@ -8,6 +8,9 @@ struct SDL_Window;
 
 /* folder of the executable, without a trailing separator ("." if unknown) */
 void os_exe_dir(char *out, size_t n);
+/* the GUI build started from a terminal: print to its console (output redirected to a
+ * file or a pipe stays as it is); 0 if stderr goes nowhere (started by a double click) */
+int os_console_attach(void);
 /* create a folder (no error if it exists) */
 void os_mkdir(const char *path);
 enum { OS_PICK_DISC, OS_PICK_BIOS };

@@ -22,6 +22,22 @@ void os_exe_dir(char *out, size_t n)
 	snprintf(out, n, "%s", p);
 }
 
+static int std_handle_ok(DWORD which)
+{
+	const HANDLE h = GetStdHandle(which);
+	return h && h != INVALID_HANDLE_VALUE;
+}
+
+int os_console_attach(void)
+{
+	const int out = std_handle_ok(STD_OUTPUT_HANDLE), err = std_handle_ok(STD_ERROR_HANDLE);
+	if (out && err) return 1;                /* a console program, or redirected */
+	if (!AttachConsole(ATTACH_PARENT_PROCESS)) return err;
+	if (!out) freopen("CONOUT$", "w", stdout);
+	if (!err) freopen("CONOUT$", "w", stderr);
+	return 1;
+}
+
 void os_mkdir(const char *path)
 {
 	_mkdir(path);
@@ -80,6 +96,11 @@ void os_exe_dir(char *out, size_t n)
 	if (!slash) { snprintf(out, n, "."); return; }
 	*slash = 0;
 	snprintf(out, n, "%s", p);
+}
+
+int os_console_attach(void)
+{
+	return 1;
 }
 
 void os_mkdir(const char *path)

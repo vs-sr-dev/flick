@@ -28,15 +28,30 @@
 #define HS_VERSION "0.1.0-dev"
 
 int g_verbose;
+static int s_error_box;              /* errors also in a message box: a window and no console */
+
+/* an error for the user: on stderr, and in a message box when nobody would see stderr */
+static void report(const char *fmt, ...)
+{
+	char m[1500];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(m, sizeof(m), fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "%s\n", m);
+#ifdef HS_HAVE_SDL
+	if (s_error_box) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Flick", m, NULL);
+#endif
+}
 
 void hs_fatal(const char *fmt, ...)
 {
+	char m[1200];
 	va_list ap;
 	va_start(ap, fmt);
-	fprintf(stderr, "fatal: ");
-	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, " (cycle %llu)\n", (unsigned long long)g_cpu.cycles);
+	vsnprintf(m, sizeof(m), fmt, ap);
 	va_end(ap);
+	report("fatal: %s (cycle %llu)", m, (unsigned long long)g_cpu.cycles);
 	if (g_trace) fflush(g_trace);
 	exit(1);
 }
@@ -591,7 +606,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 	{
-		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+		report("SDL_Init: %s", SDL_GetError());
 		return 1;
 	}
 	SDL_Window *win = SDL_CreateWindow("Flick", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -787,6 +802,7 @@ int main(int argc, char **argv)
 	int headless = 0, cpi = 0, io_cycles = 0, fast = -1, field_vblank = 0;
 	double seconds = 0;
 	uint64_t frames = 0;
+	const int console = os_console_attach();
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -853,6 +869,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	if (cpi < 0) usage();
+	s_error_box = !headless && !console;
 
 	/* the BIOS: --bios, else the one in flick.ini, else (window) ask for it */
 	config_load();
@@ -867,14 +884,14 @@ int main(int argc, char **argv)
 		if (!ok)
 		{
 			if (!bios) usage();
-			fprintf(stderr, "cannot read BIOS %s%s\n", bios, bios_given ? "" : " (from flick.ini)");
+			report("cannot read BIOS %s%s", bios, bios_given ? "" : " (from flick.ini)");
 			return 1;
 		}
 	}
 	if (fast < 0) fast = headless ? 1 : g_config.fast;   /* scripts get the same default every time */
 	if (cdpath && !(s_cd = cdimg_open(cdpath)))
 	{
-		fprintf(stderr, "cannot open disc image %s (-v for details)\n", cdpath);
+		report("cannot open disc image %s (-v for details)", cdpath);
 		return 1;
 	}
 	machine_reset(s_cd);
@@ -890,7 +907,7 @@ int main(int argc, char **argv)
 	ui_init(cards_detect_game(s_cd));
 	if (cardpath && !card_load(cardpath))
 	{
-		fprintf(stderr, "cannot read card image %s (120 bytes expected)\n", cardpath);
+		report("cannot read card image %s (120 bytes expected)", cardpath);
 		return 1;
 	}
 	if (trace) fast = 0;                     /* traces compare with MAME */
@@ -900,7 +917,7 @@ int main(int argc, char **argv)
 	g_cpu.io_cycles = io_cycles;
 	if (trace && !trace_open(trace))
 	{
-		fprintf(stderr, "cannot open trace %s\n", trace);
+		report("cannot open trace %s", trace);
 		return 1;
 	}
 
@@ -908,7 +925,7 @@ int main(int argc, char **argv)
 	{
 		if (!(s_wav = fopen(wav, "wb")))
 		{
-			fprintf(stderr, "cannot write %s\n", wav);
+			report("cannot write %s", wav);
 			return 1;
 		}
 		wav_header();

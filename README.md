@@ -49,6 +49,12 @@ volume, the window scale and the timing preset chosen with F3. It is rewritten w
 window closes, with only what was chosen in the window: command-line options are never
 saved. Runs with `--headless` read the BIOS from it but always start with the `fast` preset.
 
+On Windows Flick is a GUI program: a double click opens no console window, and errors at
+start-up show in a message box. Started from a terminal it still prints there. cmd and
+PowerShell do not wait for GUI programs, so for headless runs from them use
+`start /wait flick ...` or redirect the output (`flick ... 2>&1 | Out-Host`); bash waits as
+usual.
+
 | Option | |
 |-|-|
 | `--bios FILE` | HyperScan flash image (default: the one in `flick.ini`) |

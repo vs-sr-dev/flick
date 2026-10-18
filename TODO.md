@@ -44,9 +44,9 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       timing scelto con F3), **avvio senza argomenti** con dialogo per il BIOS (al primo
       avvio o se il file è sparito; controlla che sia di 1 MB) e per il disco; `flick
       disco.cue` apre il disco ("Apri con", trascinamento sull'exe). Da provare a mano.
-- [ ] L'exe è un'applicazione console: col doppio clic si apre anche una finestra del
-      prompt. Per la release: sottosistema GUI (`-mwindows`) + `AttachConsole` per l'output
-      da terminale, oppure lasciarla (decide l'utente).
+- [x] Applicazione GUI su Windows (scelta dell'utente): niente finestra del prompt col doppio
+      clic; da terminale `AttachConsole`, errori di avvio e fatali anche in un message box.
+      cmd/PowerShell non aspettano la fine (bash sì): vedi README.
 - [ ] Pacchetto Windows come Undertow: zip con exe, `SDL2.dll`, README, LICENSE,
       THIRD_PARTY_NOTICES; script `tools/package_release.sh`; versione nel binario.
 - [ ] Repository GitHub (privato o pubblico: decide l'utente) e workflow di release.
