@@ -78,6 +78,7 @@ static void usage(void)
 		"  --bios FILE        HyperScan flash image (1 MB; default: the one in flick.ini)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
+		"  --quickload FILE   run a HYPER.EXE directly, as MAME's quickload (homebrew)\n"
 		"  --card-at T:ID     place catalogue card ID (e.g. xmen001) on the reader at T s\n"
 		"  --cards-dir DIR    where cards placed from the F1 panel keep their saves\n"
 		"                     (default: the cards folder next to the executable)\n"
@@ -124,6 +125,22 @@ static void set_timing(int fast)
 }
 
 static cdimg *s_cd;                  /* the disc in the tray, NULL: none */
+
+/* --quickload FILE: a HYPER.EXE loaded as MAME's quickload does it (homebrew such as hs-lba):
+ * the file at 0xa00901fc, the CPU at its entry point 0xa0091000, the BIOS never runs.
+ * Applied again after every reset. */
+static char s_quickload[1024];
+
+static int quickload_apply(void)
+{
+	if (!s_quickload[0]) return 1;
+	FILE *f = os_fopen(s_quickload, "rb");
+	if (!f) return 0;
+	const size_t n = fread(&g_sdram[0x901fc], 1, SDRAM_SIZE - 0x901fc, f);
+	fclose(f);
+	g_cpu.pc = 0xa0091000;
+	return n > 0;
+}
 
 /* --cpi-at T:N: switch the CPI at emulated time T (timing experiments) */
 static uint64_t s_cpi_at_cycle = UINT64_MAX;
@@ -239,6 +256,7 @@ static void console_reset(void)
 {
 	const int cpi = g_cpu.cpi, idle = g_cpu.idle_skip, io = g_cpu.io_cycles;
 	machine_reset(s_cd);
+	quickload_apply();
 	g_cpu.cpi = cpi;
 	g_cpu.idle_skip = idle;
 	g_cpu.io_cycles = io;
@@ -827,6 +845,7 @@ int main(int argc, char **argv)
 		if (!strcmp(a, "--bios")) bios = NEXT();
 		else if (!strcmp(a, "--cd")) cdpath = NEXT();
 		else if (!strcmp(a, "--card")) cardpath = NEXT();
+		else if (!strcmp(a, "--quickload")) snprintf(s_quickload, sizeof(s_quickload), "%s", NEXT());
 		else if (!strcmp(a, "--cards-dir")) cardsdir = NEXT();
 		else if (!strcmp(a, "--card-at"))
 		{
@@ -912,6 +931,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	machine_reset(s_cd);
+	if (!quickload_apply())
+	{
+		report("cannot read %s", s_quickload);
+		return 1;
+	}
 	if (cardsdir)
 		cards_set_dir(cardsdir);
 	else

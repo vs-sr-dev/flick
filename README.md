@@ -150,6 +150,7 @@ the running list in [TODO.md](TODO.md).
 | `--bios FILE` | HyperScan flash image (default: the one in `flick.ini`) |
 | `--cd FILE` | disc image: `.cue` with one BINARY file (MODE1/2352, MODE1/2048, AUDIO tracks) or `.iso` |
 | `--card FILE` | a 120-byte card image on the reader from the start |
+| `--quickload FILE` | run a `HYPER.EXE` directly, as MAME's quickload does (homebrew such as [hs-lba](https://github.com/vs-sr-dev/hs-lba)); the BIOS does not run |
 | `--card-at T:ID` | place catalogue card ID (e.g. `xmen001`) at T seconds |
 | `--cards-dir DIR` | where written cards are saved (default `cards/`, see [Settings](#settings)) |
 | `--headless` | no window, no sound |
