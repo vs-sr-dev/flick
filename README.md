@@ -18,12 +18,12 @@ seconds) match MAME's trace exactly, down to the cycle of every interrupt, and t
 
 **M2 (in progress):** CD servo and disc images, SPU (sound, the DAC FIFO used by the games
 and the 24 hardware voices). All five retail games (X-Men, Spider-Man, Marvel Heroes, IWL,
-Ben 10) boot from their discs through the BIOS and reach gameplay; X-Men and Marvel Heroes
-have been played through fights with cards. Over the first 60-120 seconds of each, every I/O
-access and interrupt matches MAME's, and a hash of all registers taken every 100 000
-instructions matches too. The RFID card reader works: X-Men accepts a Wolverine card and
-reaches gameplay; the cards the games write are saved. Not yet: save states, a disassembler
-for traces.
+Ben 10) boot from their discs through the BIOS and reach gameplay. X-Men, Marvel Heroes,
+Ben 10 and IWL have been played with cards, Marvel Heroes and Ben 10 also by two players.
+Over the first 60-120 seconds of each, every I/O access and interrupt matches MAME's, and a
+hash of all registers taken every 100 000 instructions matches too. The RFID card reader
+works, and the cards the games write are saved: X-Men keeps a character's experience on
+the card. Not yet: save states, a disassembler for traces.
 
 Later milestones: a timing model fitted to captures from real hardware, since MAME's flat
 6 cycles per instruction makes the heavy games run at half speed (M4); a boot without the
