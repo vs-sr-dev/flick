@@ -37,12 +37,21 @@ independent project, not affiliated with Mattel or Sunplus.
 
 ## Usage
 
-    flick --bios hyperscan.bin --cd game.cue    # window, sound, real time
+Start `flick` with no arguments (or double-click it). On the first start it asks for the
+BIOS; then it offers a disc. Opening a `.cue` or `.iso` with Flick, or dropping one on the
+executable, starts that disc directly. From a terminal:
+
+    flick game.cue                                         # window, sound, real time
     flick --bios hyperscan.bin --headless --seconds 4 --screenshot logo.png
+
+`flick.ini`, next to the executable, keeps the BIOS, the folder of the last disc, the
+volume, the window scale and the timing preset chosen with F3. It is rewritten when the
+window closes, with only what was chosen in the window: command-line options are never
+saved. Runs with `--headless` read the BIOS from it but always start with the `fast` preset.
 
 | Option | |
 |-|-|
-| `--bios FILE` | HyperScan flash image (required) |
+| `--bios FILE` | HyperScan flash image (default: the one in `flick.ini`) |
 | `--cd FILE` | disc image: `.cue` with one BINARY file (MODE1/2352, MODE1/2048, AUDIO tracks) or `.iso` |
 | `--headless` | no window |
 | `--seconds S`, `--frames N` | stop after S emulated seconds / N frames |

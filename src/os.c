@@ -27,9 +27,10 @@ void os_mkdir(const char *path)
 	_mkdir(path);
 }
 
-int os_pick_disc(struct SDL_Window *win, char *out, size_t n)
+int os_pick_file(struct SDL_Window *win, int kind, const char *dir, char *out, size_t n)
 {
 	HWND owner = NULL;
+	char initial[MAX_PATH];
 #ifdef HS_HAVE_SDL
 	SDL_SysWMinfo wm;
 	SDL_VERSION(&wm.version);
@@ -43,10 +44,25 @@ int os_pick_disc(struct SDL_Window *win, char *out, size_t n)
 	out[0] = 0;
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = owner;
-	ofn.lpstrFilter = "HyperScan discs (*.cue, *.iso)\0*.cue;*.iso\0All files\0*.*\0";
+	if (kind == OS_PICK_BIOS)
+	{
+		ofn.lpstrFilter = "HyperScan BIOS (*.bin)\0*.bin\0All files\0*.*\0";
+		ofn.lpstrTitle = "Choose the HyperScan BIOS (hyperscan.bin)";
+	}
+	else
+	{
+		ofn.lpstrFilter = "HyperScan discs (*.cue, *.iso)\0*.cue;*.iso\0All files\0*.*\0";
+		ofn.lpstrTitle = "Open a HyperScan disc";
+	}
+	if (dir && *dir)
+	{
+		snprintf(initial, sizeof(initial), "%s", dir);
+		for (char *c = initial; *c; c++)
+			if (*c == '/') *c = '\\';            /* the dialog wants native separators */
+		ofn.lpstrInitialDir = initial;
+	}
 	ofn.lpstrFile = out;
 	ofn.nMaxFile = (DWORD)n;
-	ofn.lpstrTitle = "Open a HyperScan disc";
 	ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_HIDEREADONLY;
 	return GetOpenFileNameA(&ofn) != 0;
 }
@@ -71,10 +87,10 @@ void os_mkdir(const char *path)
 	mkdir(path, 0755);
 }
 
-/* no native dialog here yet: discs are dropped on the window */
-int os_pick_disc(struct SDL_Window *win, char *out, size_t n)
+/* no native dialog here yet: discs are dropped on the window, the BIOS given with --bios */
+int os_pick_file(struct SDL_Window *win, int kind, const char *dir, char *out, size_t n)
 {
-	(void)win; (void)out; (void)n;
+	(void)win; (void)kind; (void)dir; (void)out; (void)n;
 	return 0;
 }
 #endif

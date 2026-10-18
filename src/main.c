@@ -5,6 +5,7 @@
 #include <time.h>
 #include "emu.h"
 #include "machine.h"
+#include "bus.h"
 #include "devices.h"
 #include "score7.h"
 #include "trace.h"
@@ -18,6 +19,7 @@
 #include "toolbar.h"
 #include "os.h"
 #include "dump.h"
+#include "config.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -52,8 +54,10 @@ static void usage(void)
 {
 	fprintf(stderr,
 		"Flick " HS_VERSION " - Mattel HyperScan emulator\n"
-		"usage: flick --bios <hyperscan.bin> [options]\n"
-		"  --bios FILE        HyperScan flash image (1 MB, required)\n"
+		"usage: flick [options] [disc.cue|disc.iso]\n"
+		"  with no options the window asks for the BIOS (on the first start) and a disc;\n"
+		"  flick.ini next to the executable keeps the BIOS, volume, scale and timing\n"
+		"  --bios FILE        HyperScan flash image (1 MB; default: the one in flick.ini)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
 		"  --card-at T:ID     place catalogue card ID (e.g. xmen001) on the reader at T s\n"
@@ -73,7 +77,8 @@ static void usage(void)
 		"                     buttons: green red yellow blue start select lshoulder\n"
 		"                     rshoulder ltrigger rtrigger up down left right\n"
 		"  --timing fast|mame fast (default): CPI 1, idle loops skipped; mame: as\n"
-		"                     MAME (CPI 6), forced by --trace. F3 toggles\n"
+		"                     MAME (CPI 6), forced by --trace. F3 toggles; the window\n"
+		"                     starts with the last preset chosen with F3\n"
 		"  --cpi-at T:N       switch to N cycles per instruction at T seconds\n"
 		"  --io-cycles N      extra cycles per I/O access (default 0, as MAME)\n"
 		"  --field-vblank     PPU vblank per field in interlaced modes (MAME: per frame)\n"
@@ -203,6 +208,13 @@ static const char *base_name(const char *p)
 	return b;
 }
 
+/* the folder of a file path, without the separator */
+static void dir_name(const char *p, char *out, size_t n)
+{
+	const size_t l = (size_t)(base_name(p) - p);
+	snprintf(out, n, "%.*s", (int)(l ? l - 1 : 0), p);
+}
+
 static void window_title(SDL_Window *win, const char *path)
 {
 	char t[300];
@@ -241,7 +253,47 @@ static void open_disc(SDL_Window *win, const char *path)
 	window_title(win, path);
 	snprintf(m, sizeof(m), "Disc: %s", base_name(path));
 	ui_toast(m);
+	dir_name(path, g_config.disc_dir, sizeof(g_config.disc_dir));
 }
+
+#ifdef _WIN32
+static long file_size(const char *path)
+{
+	FILE *f = fopen(path, "rb");
+	if (!f) return -1;
+	fseek(f, 0, SEEK_END);
+	const long n = ftell(f);
+	fclose(f);
+	return n;
+}
+
+/* first start, or the BIOS in flick.ini has gone: explain, then the file dialog until a
+ * 1 MB image is chosen (0: cancelled). The choice goes in flick.ini. */
+static int pick_bios(const char *missing)
+{
+	char m[1300], p[1024], dir[1024] = "";
+	if (missing)
+	{
+		snprintf(m, sizeof(m), "Cannot read the HyperScan BIOS at\n%s\n\nPlease choose hyperscan.bin again.", missing);
+		dir_name(missing, dir, sizeof(dir));
+	}
+	else
+		snprintf(m, sizeof(m), "Flick needs the HyperScan BIOS: hyperscan.bin, the 1 MB image of the "
+			"console's flash (the same file MAME uses).\n\nPlease choose it in the next window; Flick will remember it.");
+	for (;;)
+	{
+		SDL_ShowSimpleMessageBox(missing ? SDL_MESSAGEBOX_WARNING : SDL_MESSAGEBOX_INFORMATION, "Flick", m, NULL);
+		if (!os_pick_file(NULL, OS_PICK_BIOS, dir, p, sizeof(p))) return 0;
+		if (file_size(p) == FLASH_SIZE && machine_load_bios(p)) break;
+		snprintf(m, sizeof(m), "%s is not a HyperScan BIOS: the flash image is exactly 1 MB "
+			"(1048576 bytes).", base_name(p));
+		missing = p;
+		dir_name(p, dir, sizeof(dir));
+	}
+	snprintf(g_config.bios, sizeof(g_config.bios), "%s", p);
+	return 1;
+}
+#endif
 
 /* screenshots/hyperscan-YYYYMMDD-HHMMSS[-n].png next to the executable */
 static void screenshot(void)
@@ -406,6 +458,15 @@ static int max_scale(SDL_Window *win)
 	return k < 1 ? 1 : k;
 }
 
+/* window at k times 640x480 (at most what fits), centred on its display */
+static void set_scale(SDL_Window *win, int k)
+{
+	const int d = SDL_GetWindowDisplayIndex(win);
+	s_scale = k > max_scale(win) ? max_scale(win) : k;
+	SDL_SetWindowSize(win, 640 * s_scale, 480 * s_scale);
+	SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED_DISPLAY(d), SDL_WINDOWPOS_CENTERED_DISPLAY(d));
+}
+
 static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio)
 {
 	switch (cmd)
@@ -413,7 +474,7 @@ static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio
 	case TB_DISC:
 	{
 		char p[1024];
-		if (os_pick_disc(win, p, sizeof(p)))
+		if (os_pick_file(win, OS_PICK_DISC, g_config.disc_dir, p, sizeof(p)))
 			open_disc(win, p);
 #ifndef _WIN32
 		else
@@ -439,16 +500,15 @@ static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio
 	{
 		const int fast = g_cpu.cpi == 6;
 		set_timing(fast);
+		g_config.fast = fast;
 		ui_toast(fast ? "Timing: fast (CPI 1)" : "Timing: MAME (CPI 6, frame vblank)");
 		break;
 	}
 	case TB_SHOT: screenshot(); break;
 	case TB_SCALE:
 		if (s_fullscreen) break;
-		s_scale = s_scale % max_scale(win) + 1;
-		SDL_SetWindowSize(win, 640 * s_scale, 480 * s_scale);
-		SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(win)),
-			SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetWindowDisplayIndex(win)));
+		set_scale(win, s_scale % max_scale(win) + 1);
+		g_config.scale = s_scale;
 		break;
 	case TB_FULLSCREEN:
 		s_fullscreen = !s_fullscreen;
@@ -456,7 +516,7 @@ static void command(int cmd, int value, SDL_Window *win, SDL_AudioDeviceID audio
 		break;
 	case TB_MUTE: s_muted = !s_muted; break;
 	case TB_VOLUME:
-		s_volume = value;
+		s_volume = g_config.volume = value;
 		if (value > 0) s_muted = 0;
 		break;
 	}
@@ -527,7 +587,7 @@ static tb_state toolbar_state(void)
 	return st;
 }
 
-static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
+static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, int ask_disc)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 	{
@@ -540,6 +600,14 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 	SDL_RenderSetLogicalSize(ren, 640, 480);     /* also maps mouse events to 640x480 */
 	SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, 640, 480);
 	window_title(win, cdpath);
+	s_volume = g_config.volume;
+	if (g_config.scale > 1) set_scale(win, g_config.scale);
+	if (ask_disc)                                /* started with no disc: offer one */
+	{
+		SDL_RenderClear(ren);
+		SDL_RenderPresent(ren);
+		command(TB_DISC, 0, win, 0);
+	}
 
 	SDL_AudioSpec want = { 0 }, have;
 	want.freq = SPU_OUT_RATE;
@@ -708,6 +776,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 	SDL_DestroyRenderer(ren);
 	SDL_DestroyWindow(win);
 	SDL_Quit();
+	if (!config_save()) fprintf(stderr, "cannot write flick.ini next to the executable\n");
 	return 0;
 }
 #endif
@@ -715,7 +784,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 int main(int argc, char **argv)
 {
 	const char *bios = NULL, *shot = NULL, *wav = NULL, *render_dump = NULL, *dump_dir = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
-	int headless = 0, cpi = 0, io_cycles = 0, fast = 1, field_vblank = 0;
+	int headless = 0, cpi = 0, io_cycles = 0, fast = -1, field_vblank = 0;
 	double seconds = 0;
 	uint64_t frames = 0;
 
@@ -766,6 +835,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--input")) { if (!input_script_parse(NEXT())) usage(); }
 		else if (!strcmp(a, "--log-uart")) g_log_uart = 1;
 		else if (!strcmp(a, "-v")) g_verbose = 1;
+		else if (a[0] != '-' && !cdpath) cdpath = a;     /* "Open with", a disc dropped on the exe */
 		else usage();
 	}
 	if (render_dump)                        /* re-render a Ctrl+F12 dump, no BIOS needed */
@@ -782,13 +852,26 @@ int main(int argc, char **argv)
 			fprintf(stderr, "cannot write %s\n", shot ? shot : out);
 		return 0;
 	}
-	if (!bios || cpi < 0) usage();
+	if (cpi < 0) usage();
 
-	if (!machine_load_bios(bios))
+	/* the BIOS: --bios, else the one in flick.ini, else (window) ask for it */
+	config_load();
+	const int bios_given = bios != NULL;
+	if (!bios && g_config.bios[0]) bios = g_config.bios;
+	if (!bios || !machine_load_bios(bios))
 	{
-		fprintf(stderr, "cannot read BIOS %s\n", bios);
-		return 1;
+		int ok = 0;
+#if defined(HS_HAVE_SDL) && defined(_WIN32)
+		if (!headless && !bios_given) ok = pick_bios(bios);
+#endif
+		if (!ok)
+		{
+			if (!bios) usage();
+			fprintf(stderr, "cannot read BIOS %s%s\n", bios, bios_given ? "" : " (from flick.ini)");
+			return 1;
+		}
 	}
+	if (fast < 0) fast = headless ? 1 : g_config.fast;   /* scripts get the same default every time */
 	if (cdpath && !(s_cd = cdimg_open(cdpath)))
 	{
 		fprintf(stderr, "cannot open disc image %s (-v for details)\n", cdpath);
@@ -836,7 +919,7 @@ int main(int argc, char **argv)
 	int rc;
 #ifdef HS_HAVE_SDL
 	if (!headless)
-		rc = run_window(end_cycle, frames, cdpath);
+		rc = run_window(end_cycle, frames, cdpath, !cdpath && !bios_given);
 	else
 #endif
 	{
