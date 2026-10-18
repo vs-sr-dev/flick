@@ -2,6 +2,20 @@
 
 Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e uso).
 
+## Sessione del 2026-10-18: Flick è pubblico
+
+- **Nome Flick**, icona, `flick.ini`, avvio senza argomenti, exe GUI, pannello dei controlli
+  (F4), percorsi UTF-8; repo pubblico https://github.com/vs-sr-dev/flick, annunciato su
+  r/Hyperscan; riga nel README del profilo.
+- **Release** (pre-release, zip Windows + tar.gz Linux): 0.1.0, 0.1.1 (Linux), 0.1.2
+  (`--quickload`, gira hs-lba), 0.1.3 (audio di IWL). `tools/package_release.sh` e
+  `tools/package_linux.sh` (da WSL).
+- **IWL:** fase video al 42% -> skip delle attese sul contatore di riga (esatto); audio
+  mancante -> registro di stato dei canali SPU. Confermati dall'utente.
+- **Prossimo:** testimonianze di partite fino in fondo (thread, issue); poi filtro TV,
+  modo "passa la carta", save state, screenshot nel README con disclaimer, Mac (da una
+  sessione sul MacBook), release automatiche.
+
 ## Stato alla fine della sessione del 2026-10-05
 
 - **M1 fatto:** CPU S+core 7, bus, timer, I2C + pad, PPU, timing schermo/TV; boot identico
