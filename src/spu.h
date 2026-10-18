@@ -1,4 +1,4 @@
-/* HyperScanEmu - SPG290 SPU (port of the HS-LBA fork's spg290_spu.cpp) */
+/* Flick - SPG290 SPU (port of the HS-LBA fork's spg290_spu.cpp) */
 #ifndef HS_SPU_H
 #define HS_SPU_H
 

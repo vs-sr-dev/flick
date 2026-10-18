@@ -1,4 +1,4 @@
-/* HyperScanEmu - the HyperScan machine.
+/* Flick - the HyperScan machine.
  * The I/O map mirrors MAME's spg29x driver (spg290_mem + spg290_bios_mem, BSD-3-Clause,
  * Sandro Ronco): unmapped reads return 0 and unmapped writes are dropped, as in MAME,
  * so that traces compare. Blocks MAME does not map (CKG, SFTCFG, MIU, UART, ...) stay

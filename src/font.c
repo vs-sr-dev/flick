@@ -1,4 +1,4 @@
-/* HyperScanEmu - 5x7 bitmap font (HD44780-style glyphs drawn for this project) and text
+/* Flick - 5x7 bitmap font (HD44780-style glyphs drawn for this project) and text
  * drawing into 0xAARRGGBB buffers, for the on-screen panels. */
 #include <string.h>
 #include "font.h"

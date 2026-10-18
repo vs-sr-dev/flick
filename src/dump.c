@@ -1,4 +1,4 @@
-/* HyperScanEmu - debug dumps (see dump.h). The video state is the PPU's and the TV
+/* Flick - debug dumps (see dump.h). The video state is the PPU's and the TV
  * encoder's registers and memories in a fixed layout, valid for the same build: a dump is
  * a way to bring a glitch home from a play session, not a save state. */
 #include <stdio.h>

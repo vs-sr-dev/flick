@@ -1,4 +1,4 @@
-/* HyperScanEmu - HyperScan RFID card (port of MAME's hyperscan_card.cpp) */
+/* Flick - HyperScan RFID card (port of MAME's hyperscan_card.cpp) */
 #ifndef HS_CARD_H
 #define HS_CARD_H
 

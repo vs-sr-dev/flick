@@ -1,4 +1,4 @@
-/* HyperScanEmu - on-screen card panel and messages (640x480 ARGB overlay) */
+/* Flick - on-screen card panel and messages (640x480 ARGB overlay) */
 #ifndef HS_UI_H
 #define HS_UI_H
 

@@ -1,4 +1,4 @@
-/* HyperScanEmu - memory map slow path (see bus.h) */
+/* Flick - memory map slow path (see bus.h) */
 #include "bus.h"
 #include "trace.h"
 #include "score7.h"

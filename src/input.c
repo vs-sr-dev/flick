@@ -1,4 +1,4 @@
-/* HyperScanEmu - controller input (see input.h)
+/* Flick - controller input (see input.h)
  * Bits follow MAME's hyperscan_ctrl ports: IN.0 Blue 01, Start 02, Select 04, L shoulder 08,
  * R shoulder 10, L trigger 20, R trigger 40; IN.1 Yellow 20, Red 40, Green 80; IN.2/IN.3
  * the analog stick (Y, X), 0x7f at rest, reversed. */

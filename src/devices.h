@@ -1,4 +1,4 @@
-/* HyperScanEmu - SPG290 peripherals
+/* Flick - SPG290 peripherals
  * Timer, I2C, PPU and screen are ports of the MAME devices by Sandro Ronco
  * (BSD-3-Clause): spg290_timer.cpp, spg290_i2c.cpp, spg290_ppu.cpp, hyperscan_ctrl.cpp,
  * plus the timing parts of MAME's screen_device. */

@@ -35,8 +35,9 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 ## Prossima sessione
 
 ### 0. Nome
-- [ ] Scegliere il nome dell'emulatore (proposte nel wrap-up del 2026-10-05: Underscan,
-      Overscan, Swipe, Hyperion…), poi rinominare eseguibile, finestra, README e repo.
+- [x] **Flick** (2026-10-18): eseguibile `flick.exe`, finestra, README, commenti dei sorgenti.
+      Restano col vecchio nome la cartella del progetto, RECON.md/PROMPT.md (storici) e la
+      patch del fork MAME; il repo GitHub nascerà già come `flick`.
 
 ### 1. Verso la prima release
 - [ ] File di configurazione accanto all'eseguibile: BIOS, ultima cartella dei dischi,

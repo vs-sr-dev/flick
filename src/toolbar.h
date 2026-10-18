@@ -1,4 +1,4 @@
-/* HyperScanEmu - toolbar along the top of the window (640x480 ARGB overlay) */
+/* Flick - toolbar along the top of the window (640x480 ARGB overlay) */
 #ifndef HS_TOOLBAR_H
 #define HS_TOOLBAR_H
 

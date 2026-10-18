@@ -1,4 +1,4 @@
-/* HyperScanEmu - event scheduler (see sched.h) */
+/* Flick - event scheduler (see sched.h) */
 #include "sched.h"
 #include "score7.h"
 

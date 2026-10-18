@@ -1,4 +1,4 @@
-/* HyperScanEmu - toolbar along the top of the window, drawn into the 640x480 0xAARRGGBB
+/* Flick - toolbar along the top of the window, drawn into the 640x480 0xAARRGGBB
  * overlay in the card panel's style: 12x12 pixel-art icons at twice their size, a tooltip
  * under the button the pointer is on, a volume slider. It shows when the pointer moves
  * and hides 2.5 s later (never while paused or while the pointer is on it). Frontend

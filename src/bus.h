@@ -1,4 +1,4 @@
-/* HyperScanEmu - SPG290 memory map (29-bit, as MAME's spg290_mem + spg290_bios_mem)
+/* Flick - SPG290 memory map (29-bit, as MAME's spg290_mem + spg290_bios_mem)
  *   0x00000000-0x07ffffff  SDRAM 16 MB, mirrored
  *   0x08000000-0x09ffffff  I/O blocks (machine.c dispatches; unmapped reads 0, as MAME)
  *   0x0a000000-0x0a003fff  internal SRAM 16 KB

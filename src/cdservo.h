@@ -1,4 +1,4 @@
-/* HyperScanEmu - SPG290 CD servo (port of MAME's spg290_cdservo.cpp) */
+/* Flick - SPG290 CD servo (port of MAME's spg290_cdservo.cpp) */
 #ifndef HS_CDSERVO_H
 #define HS_CDSERVO_H
 

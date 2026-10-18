@@ -1,7 +1,8 @@
-# HyperScanEmu
+# Flick
 
 An emulator for the **Mattel HyperScan** (2006), the Sunplus SPG290-based console that
-reads game discs and RFID character cards. Work in progress.
+reads game discs and RFID character cards. Work in progress. The name is the flick of the
+wrist that puts a card on the scanner.
 
 The goal is an emulator that runs the retail games at the right speed with sound. MAME's
 `hyprscan` driver is the starting point and the reference. Its CPU and video code is ported
@@ -31,13 +32,13 @@ BIOS (M5). The analysis behind this plan is in [RECON.md](RECON.md).
 ## Legal
 
 This repository contains **no** BIOS, game code or disc data. You need your own dump of
-the HyperScan flash (`hyperscan.bin`, 1 MB, the same file MAME uses). HyperScanEmu is an
+the HyperScan flash (`hyperscan.bin`, 1 MB, the same file MAME uses). Flick is an
 independent project, not affiliated with Mattel or Sunplus.
 
 ## Usage
 
-    hyperscanemu --bios hyperscan.bin --cd game.cue    # window, sound, real time
-    hyperscanemu --bios hyperscan.bin --headless --seconds 4 --screenshot logo.png
+    flick --bios hyperscan.bin --cd game.cue    # window, sound, real time
+    flick --bios hyperscan.bin --headless --seconds 4 --screenshot logo.png
 
 | Option | |
 |-|-|
@@ -124,5 +125,5 @@ time). Other platforms should only need build tweaks.
 [tools/mame/](tools/mame/) holds the patch for a MAME fork that writes the reference
 trace (`HS_TRACE`). `record-ref.sh` records the BIOS boot reference and `record-games.sh`
 sparse references for the games listed in `tools/games.sh`. `tools/regress.sh` compares
-HyperScanEmu with all of them; `tools/tracediff.sh` shows the first divergence between two
+Flick with all of them; `tools/tracediff.sh` shows the first divergence between two
 traces, with context.

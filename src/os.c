@@ -1,4 +1,4 @@
-/* HyperScanEmu - host services (see os.h) */
+/* Flick - host services (see os.h) */
 #include <stdio.h>
 #include <string.h>
 #include "os.h"

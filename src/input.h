@@ -1,4 +1,4 @@
-/* HyperScanEmu - controller input: buttons by name, scripted presses */
+/* Flick - controller input: buttons by name, scripted presses */
 #ifndef HS_INPUT_H
 #define HS_INPUT_H
 

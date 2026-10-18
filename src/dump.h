@@ -1,4 +1,4 @@
-/* HyperScanEmu - debug dumps: a frame's video state and RAM, to re-render it offline */
+/* Flick - debug dumps: a frame's video state and RAM, to re-render it offline */
 #ifndef HS_DUMP_H
 #define HS_DUMP_H
 

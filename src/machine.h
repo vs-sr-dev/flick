@@ -1,4 +1,4 @@
-/* HyperScanEmu - the HyperScan machine: memory map dispatch, reset, run loop */
+/* Flick - the HyperScan machine: memory map dispatch, reset, run loop */
 #ifndef HS_MACHINE_H
 #define HS_MACHINE_H
 

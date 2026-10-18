@@ -1,4 +1,4 @@
-/* HyperScanEmu - card catalogue (MAME's hyperscan_card list) and the cards folder */
+/* Flick - card catalogue (MAME's hyperscan_card list) and the cards folder */
 #ifndef HS_CARDS_H
 #define HS_CARDS_H
 

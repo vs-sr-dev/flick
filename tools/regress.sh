@@ -4,7 +4,7 @@
 #     (tools/m1check.sh, references from tools/mame/record-ref.sh)
 #   - games: sparse traces of each game in tools/games.sh
 #     (references from tools/mame/record-games.sh)
-# Env: BIOS (hyperscan.bin). Needs build/hyperscanemu.exe.
+# Env: BIOS (hyperscan.bin). Needs build/flick.exe.
 set -e
 : "${BIOS:?set BIOS to the HyperScan flash image (hyperscan.bin)}"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -17,7 +17,7 @@ for g in $GAMES; do
   cue=${GAME_CUE[$g]}
   if [ ! -f "$cue" ] || [ ! -f "$S/ref-$g.trace" ]; then echo "$g: skipped (no image or reference)"; continue; fi
   n=$(( GAME_SEC[$g] * 18000000 ))
-  "$ROOT/build/hyperscanemu.exe" --bios "$BIOS" --cd "$cue" --headless --trace "$(cygpath -m "$S")/ours-$g.trace:$n:100000" &
+  "$ROOT/build/flick.exe" --bios "$BIOS" --cd "$cue" --headless --trace "$(cygpath -m "$S")/ours-$g.trace:$n:100000" &
 done
 wait
 for g in $GAMES; do

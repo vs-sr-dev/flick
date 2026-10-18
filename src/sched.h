@@ -1,4 +1,4 @@
-/* HyperScanEmu - event scheduler
+/* Flick - event scheduler
  *
  * Mirrors MAME's device_scheduler closely enough to land every event on the same
  * instruction: the CPU's local time is cycles * aps (aps = 10^18 / 108 MHz, truncated,

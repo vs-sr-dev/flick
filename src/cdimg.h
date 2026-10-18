@@ -1,4 +1,4 @@
-/* HyperScanEmu - CD images (.cue with one BINARY file, .iso)
+/* Flick - CD images (.cue with one BINARY file, .iso)
  * Reproduces what MAME's cdrom_file returns for these layouts, so that the CD servo
  * delivers byte-identical sectors. */
 #ifndef HS_CDIMG_H

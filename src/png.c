@@ -1,4 +1,4 @@
-/* HyperScanEmu - minimal PNG writer (RGB8, uncompressed deflate blocks, no dependencies) */
+/* Flick - minimal PNG writer (RGB8, uncompressed deflate blocks, no dependencies) */
 #include <stdlib.h>
 #include "png.h"
 

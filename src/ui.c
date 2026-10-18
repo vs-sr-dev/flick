@@ -1,4 +1,4 @@
-/* HyperScanEmu - on-screen card panel and messages, drawn into a 640x480 0xAARRGGBB
+/* Flick - on-screen card panel and messages, drawn into a 640x480 0xAARRGGBB
  * overlay. Frontend independent: the frontend maps its keys to UI_* and composites. */
 #include <ctype.h>
 #include <stdio.h>

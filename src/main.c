@@ -1,4 +1,4 @@
-/* HyperScanEmu - command line and frontend */
+/* Flick - command line and frontend */
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,8 +51,8 @@ void hs_log(const char *fmt, ...)
 static void usage(void)
 {
 	fprintf(stderr,
-		"HyperScanEmu " HS_VERSION " - Mattel HyperScan emulator\n"
-		"usage: hyperscanemu --bios <hyperscan.bin> [options]\n"
+		"Flick " HS_VERSION " - Mattel HyperScan emulator\n"
+		"usage: flick --bios <hyperscan.bin> [options]\n"
 		"  --bios FILE        HyperScan flash image (1 MB, required)\n"
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
@@ -207,9 +207,9 @@ static void window_title(SDL_Window *win, const char *path)
 {
 	char t[300];
 	const int game = cards_detect_game(s_cd);
-	if (game != CARD_ANY) snprintf(t, sizeof(t), "HyperScanEmu - %s", cards_game_name(game));
-	else if (path) snprintf(t, sizeof(t), "HyperScanEmu - %s", base_name(path));
-	else snprintf(t, sizeof(t), "HyperScanEmu");
+	if (game != CARD_ANY) snprintf(t, sizeof(t), "Flick - %s", cards_game_name(game));
+	else if (path) snprintf(t, sizeof(t), "Flick - %s", base_name(path));
+	else snprintf(t, sizeof(t), "Flick");
 	SDL_SetWindowTitle(win, t);
 }
 
@@ -534,7 +534,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath)
 		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
 		return 1;
 	}
-	SDL_Window *win = SDL_CreateWindow("HyperScanEmu", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+	SDL_Window *win = SDL_CreateWindow("Flick", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		640, 480, SDL_WINDOW_RESIZABLE);
 	SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	SDL_RenderSetLogicalSize(ren, 640, 480);     /* also maps mouse events to 640x480 */

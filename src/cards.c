@@ -1,4 +1,4 @@
-/* HyperScanEmu - card catalogue and the cards folder (see cards.h).
+/* Flick - card catalogue and the cards folder (see cards.h).
  * Every card in the catalogue is rebuilt from its game ID and number (zero UID, bytes 8-9
  * game, 10-11 card; big-endian for Marvel Heroes), exactly as MAME's list images. When a
  * game writes to a card (progress, unlocks), the card is saved as <dir>/<id>.bin and that

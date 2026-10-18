@@ -1,4 +1,4 @@
-/* HyperScanEmu - instruction trace, same format as the MAME fork's HS_TRACE
+/* Flick - instruction trace, same format as the MAME fork's HS_TRACE
  * (tools/mame/recon.patch, comment above struct hs_trace in score.cpp):
  *   S <all regs>                     state before the first instruction
  *   <pc> <op> [reg=val ...]          one per instruction, changed registers only

@@ -1,4 +1,4 @@
-/* HyperScanEmu - Sunplus S+core 7 interpreter
+/* Flick - Sunplus S+core 7 interpreter
  * Port of MAME's score7_cpu_device (BSD-3-Clause, Sandro Ronco), see score7.c. */
 #ifndef HS_SCORE7_H
 #define HS_SCORE7_H

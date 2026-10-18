@@ -1,4 +1,4 @@
-/* HyperScanEmu - CD images (see cdimg.h).
+/* Flick - CD images (see cdimg.h).
  * Supported: .iso (one MODE1/2048 track) and .cue sheets with a single BINARY file whose
  * tracks are MODE1/2048, MODE1/2352 or AUDIO, with INDEX 01 (INDEX 00, PREGAP and POSTGAP
  * are rejected for now: no HyperScan dump seen so far uses them). */

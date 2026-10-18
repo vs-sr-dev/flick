@@ -1,4 +1,4 @@
-/* HyperScanEmu - instruction trace (see trace.h) */
+/* Flick - instruction trace (see trace.h) */
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>

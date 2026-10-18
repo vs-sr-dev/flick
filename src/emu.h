@@ -1,4 +1,4 @@
-/* HyperScanEmu - common definitions */
+/* Flick - common definitions */
 #ifndef HS_EMU_H
 #define HS_EMU_H
 

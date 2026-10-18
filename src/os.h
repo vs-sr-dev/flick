@@ -1,4 +1,4 @@
-/* HyperScanEmu - the few host services the frontend needs (kept apart from windows.h) */
+/* Flick - the few host services the frontend needs (kept apart from windows.h) */
 #ifndef HS_OS_H
 #define HS_OS_H
 
