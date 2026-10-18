@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(flick VERSION 0.1.2 LANGUAGES C)
+project(flick VERSION 0.1.3 LANGUAGES C)
 
 # the version in the binary: X.Y.Z-dev while developing, X.Y.Z in the release package
 # (tools/package_release.sh sets the suffix to empty)
