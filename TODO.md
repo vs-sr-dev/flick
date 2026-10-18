@@ -67,10 +67,10 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       traccia M1 identica a MAME (a meno dei CRLF del riferimento), stessa velocità.
       Cartelle: accanto all'exe se scrivibile, sennò XDG; dialoghi con zenity/kdialog (provati
       con un finto zenity); `tools/package_linux.sh` -> `flick-<ver>-linux-x86_64.tar.gz`
-      (SDL2 di sistema, glibc >= 2.34). Da pubblicare: decide l'utente.
+      (SDL2 di sistema, glibc >= 2.34). Pubblicato nella pre-release **v0.1.1** (`64138eb`).
 - [ ] Linux: provarlo su un desktop vero (zenity reale, gamepad, audio PulseAudio/PipeWire),
       icona e voce `.desktop`; magari AppImage.
-- [ ] macOS: `os_exe_dir` c'è (non compilato); servono `~/Library/Application Support/Flick`,
+- [ ] macOS (da una sessione Claude Code sul MacBook dell'utente, clonando il repo): `os_exe_dir` c'è (non compilato); servono `~/Library/Application Support/Flick`,
       dialogo (NSOpenPanel o osascript), `.app` con `.icns`, firma/notarizzazione. Serve un tester.
 
 ### 2. Frontend
