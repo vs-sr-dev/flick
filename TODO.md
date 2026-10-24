@@ -12,7 +12,8 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
   `tools/package_linux.sh` (da WSL).
 - **IWL:** fase video al 42% -> skip delle attese sul contatore di riga (esatto); audio
   mancante -> registro di stato dei canali SPU. Confermati dall'utente.
-- **Prossimo:** testimonianze di partite fino in fondo (thread, issue); poi filtro TV,
+- **Prossimo:** **core libretro** (sezione 1c, scelta dell'utente il 2026-10-24, strada per
+  Android); testimonianze di partite fino in fondo (thread, issue); poi filtro TV,
   modo "passa la carta", save state, screenshot nel README con disclaimer, Mac (da una
   sessione sul MacBook), release automatiche.
 
@@ -87,6 +88,78 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
 - [ ] macOS (da una sessione Claude Code sul MacBook dell'utente, clonando il repo): `os_exe_dir` c'è (non compilato); servono `~/Library/Application Support/Flick`,
       dialogo (NSOpenPanel o osascript), `.app` con `.icns`, firma/notarizzazione. Serve un tester.
 
+### 1c. Core libretro (la strada per Android) - prossima sessione
+Scelta dell'utente (2026-10-24) dopo due richieste di una versione Android (un commento in
+portoghese, un commento a un commit su GitHub). Un core libretro porta Flick su RetroArch:
+Android, macOS, Steam Deck, console; menu, file, rimappatura e shader li dà il frontend.
+Su Android i core si installano solo dall'Online Updater, quindi alla fine serve il
+buildbot di libretro. Un'app Android standalone (SDL2 + SAF + touch) resta possibile dopo,
+sullo stesso core. `flick.exe` resta com'è.
+
+**Passo 1, core base (una sessione):**
+- [ ] `libretro.h` da libretro-common (MIT) in `src/libretro/`; nuovo `src/libretro.c`; target
+      CMake `flick_libretro` (`SHARED`, opzione `HS_LIBRETRO`) con il core senza `main.c`,
+      `toolbar.c`, `controls.c` e le parti SDL di `os.c`/`input.c`. Prefisso `lib` tolto su Windows.
+- [ ] `retro_get_system_info`: nome "Flick", versione da CMake, estensioni `cue|iso|bin`,
+      `need_fullpath = true` (cdimg legge dal file).
+- [ ] `retro_get_system_av_info`: 640x480 massimo, misura reale da `screen_width/height()`
+      a ogni frame (HVGA 640x240 per Ben 10 in due giocatori: aspect 4:3 comunque);
+      `fps` 60 da verificare col periodo di `screen.c`; `sample_rate` = `SPU_OUT_RATE` (44100).
+- [ ] `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` XRGB8888 (è già il formato di `g_frame`).
+- [ ] BIOS: `hyperscan.bin` dalla cartella system (`GET_SYSTEM_DIRECTORY`), con il controllo
+      sul dump noto di `37b05f7`; se manca, messaggio (`SET_MESSAGE`) e `retro_load_game`
+      fallisce. Dichiararlo con `SET_FIRMWARE`/file `.info` per il menu "System Files".
+- [ ] `retro_run`: un frame = `machine_run_until(cycles + CPU_CLOCK / 60)` come il ramo senza
+      audio del loop SDL ([main.c](src/main.c), ~riga 770), poi `spu_sync` + `spu_take` ->
+      `audio_sample_batch` (~735 campioni stereo per frame), poi `video_refresh(g_frame, w, h,
+      sizeof(g_frame[0]))`. Il preset di timing resta `fast`.
+- [ ] Input: RetroPad -> pulsanti HyperScan con `input_set`/`input_joy` ([input.c](src/input.c)),
+      due porte; descrittori (`SET_INPUT_DESCRIPTORS`) con i nomi di `input_button_name`.
+- [ ] Log via `GET_LOG_INTERFACE` al posto di `fprintf(stderr)`; nessun `exit()` nel core
+      (gli errori fatali di oggi vanno trasformati in ritorni d'errore).
+- [ ] Stato globale: ~76 variabili statiche/globali. `retro_unload_game` + `retro_load_game`
+      di un altro disco nello stesso processo deve ripartire pulito: controllare che
+      `machine_reset` (+ `sched_reset`, card, cards, ui) azzeri tutto; ricaricare due
+      giochi di fila e confrontare con un avvio a freddo.
+- [ ] Verifica con il RetroArch dell'utente, **`F:\RetroArch 2\`** (portable, exe del luglio
+      2023 ~1.15; cartelle relative `:\cores`, `:\system`, `:\saves`; log verboso già attivo).
+      Caricare il core dalla cartella di build senza copiarlo in `cores\` (`retroarch.exe -L
+      <build>\flick_libretro.dll <disco>.cue --verbose`); il BIOS va copiato in `system\` come
+      `hyperscan.bin`. Non toccare `retroarch.cfg` né gli altri core: è l'installazione che
+      l'utente usa. Provare i cinque giochi; un frame con `--screenshot` dello standalone e lo
+      stesso istante dal core devono coincidere (stesso preset, nessun input).
+- [ ] **Velocità su Android, prima di andare oltre:** compilare il core per arm64-v8a con
+      l'NDK (solo 64 bit: serve `unsigned __int128`), caricarlo in RetroArch e misurare X-Men
+      in combattimento e IWL (fase t=56-60 s). Telefoni: **Poco X3 Pro** dell'utente (M2102J20SG,
+      Snapdragon 860, core A76 a ~2,96 GHz: fascia media di oggi) e **Samsung S24 Ultra** del padre (8 Gen 3,
+      fascia alta: chiedere prima, è un'installazione da origini sconosciute). Serve il
+      RetroArch dell'APK di retroarch.com: quello del Play Store non carica core copiati a mano.
+      Se non regge, il passo successivo è l'interprete (`score7.c`), non il frontend.
+- [ ] (più avanti) iPhone 15 Pro Max dell'utente: RetroArch per iOS compilato con il core dalla
+      sessione sul MacBook, installato con Apple ID gratuito (firma di 7 giorni). Niente JIT
+      necessario (interprete). Sull'App Store solo se libretro include il core.
+
+**Passo 2, carte e salvataggi:**
+- [ ] Pannello carte col pad: un tasto del RetroPad (es. L3 o Select+L) apre il pannello di
+      [ui.c](src/ui.c), d-pad/A/B guidano `ui_key`; l'overlay ARGB di `ui_render` composto
+      sopra `g_frame` prima di `video_refresh`. Ricerca per testo senza tastiera: lista
+      filtrata per gioco (già da `cards_detect_game`), scorrimento a pagine.
+- [ ] Carte salvate (`cards/*.bin`) nella cartella saves (`GET_SAVE_DIRECTORY`/flick/).
+- [ ] Opzioni del core (`SET_CORE_OPTIONS_V2`): timing fast/mame, volume se serve.
+- [ ] Cambio disco: interfaccia disk control (`SET_DISK_CONTROL_EXT_INTERFACE`), per ora un
+      disco per gioco; reset (`retro_reset` -> `machine_reset`).
+
+**Passo 3, save state** (vale anche per lo standalone, vedi 2. Frontend):
+- [ ] `retro_serialize_size`/`retro_serialize`/`retro_unserialize`: CPU, SDRAM/SRAM, device,
+      scheduler (eventi in tempo atto), posizione nel CD, SPU; formato versionato. Con
+      questo RetroArch dà anche rewind e run-ahead.
+
+**Passo 4, distribuzione:**
+- [ ] `Makefile.libretro` (preferito dal buildbot; CMake accettato), `flick_libretro.info`
+      (nome, estensioni, firmware `hyperscan.bin` con MD5), sezione nel README.
+- [ ] Ricetta per il buildbot / PR ai repository di libretro (licenze: MIT + BSD-3 di
+      `card.c`, ok). Solo quando passi 1-2 sono provati e la velocità su Android è nota.
+
 ### 2. Frontend
 - [ ] Filtro TV: l'HyperScan esce solo in composito, che fonde il dithering dei giochi
       (RGB565 a trame alternate). Spento / composito (YIQ, luminanza ~3 px, crominanza molto
@@ -106,7 +179,8 @@ Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e u
       rifaceva: ~60 campioni e poi niente. Ora stato e flag di stop (0x102c) come SPG2xx
       (preset fast). La traccia vocale del video iniziale c'è, "qualità perfetta" (utente).
       Gli altri quattro giochi: WAV identico al byte; regressione identica.
-- [ ] IWL: sentire il resto (menu, incontri) per conferma; voci a picco -18 dBFS (VolSel 1).
+- [x] IWL: sentire il resto (menu, incontri): partita intera, suono perfetto ovunque, e tutte
+      le carte provate riconosciute (utente, 2026-10-18). Voci a picco -18 dBFS (VolSel 1).
 - [ ] **X-Men, menu:** col nuovo I2C i pad sono letti 30 volte al secondo invece di 15; se
       i menu seguono il polling potrebbero animarsi al doppio. Confronto coi video.
 - [ ] Gameplay di Spider-Man e IWL col preset fast: carte, frame rate a confronto con i video.
