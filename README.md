@@ -137,6 +137,12 @@ version and DOOM, started from the loader or from its own disc.
 - **Loading times** follow MAME's CD drive, which answers instantly; the real console
   takes longer to seek. Fitting them to the hardware is still to do.
 - On a slow PC a few stretches of IWL (loading, decompression) may not hold full speed.
+- **The boot logo runs at about twice its speed.** On the console its three pulses are
+  about 2.5 seconds apart and each has its sound; in Flick they are 1.5 seconds apart and
+  the sound plays once and a half.
+- **Homebrew that paces itself on the controller** (the SDK's PONG, the USB loader's menu)
+  runs too fast with the default timing: the controllers answer faster than on the console.
+  F3 (MAME's timing) slows it down to something playable.
 - No save states yet.
 
 ## How it works

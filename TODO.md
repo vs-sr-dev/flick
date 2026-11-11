@@ -33,6 +33,38 @@ Spunto: su Reddit l'autore del DOOM per HyperScan segnala schermo nero col suo h
   esce 35 righe più in basso e 98 pixel a destra, col bordo che rientra da sinistra. Sulla
   console vera è uguale? Se no, il registro dell'indirizzo del frame buffer fa qualcosa che
   non sappiamo. Dal sorgente, DOOM non legge il pad (gira solo la demo).
+- **Aperto, il ritmo del loop del BIOS e delle letture dei pad** (prove dell'utente sulla
+  0.1.3-dev, nessuna modifica al codice):
+  - PONG e il menu del loader non aspettano il vblank: vanno al ritmo di
+    `HS_Controller_Read` (10 letture I2C). Preset fast (I2C a 108 MHz, 0,85 ms a lettura):
+    98 giri/s, palla da lato a lato in 0,8 s, un passo di menu ogni 40 ms = ingiocabile,
+    grilletti "hit & miss". Con 3,2 ms a lettura: 29 giri/s, un tocco di 0,1 s = un passo.
+  - Il jingle suona per ogni lettura sotto ~3,3 ms (clock I2C >= 28 MHz col divisore di
+    MAME): i 108 MHz erano 4 volte più del necessario. Ma all'orecchio dell'utente 3,2 ms
+    e 0,85 ms sono uguali, e sbagliati entrambi:
+  - **Sulla console vera i suoni del logo sono tre, in sincrono coi tre impulsi visivi
+    (utente). In Flick: tre impulsi, un suono e mezzo, poi "pzzt".** Il jingle è il KVAG a
+    0xA0071410 (flash 0x72214): 2,5 s, un solo "zzzmmm" (0,6 s di silenzio, salita, coda).
+    Il BIOS lo suona in loop (`0xA0009BCC(0)`, id 0 in `0xA000A3D4`) dall'inizio alla fine
+    dell'animazione: DAC acceso a 5,56 s, spento a 9,23 s = 3,67 s, 110 passi, uno per
+    frame; picchi visivi a +0,80, +2,24, +3,70 s (44 frame l'uno). Tre suoni interi vogliono
+    ~7,5 s: **l'animazione in Flick va circa al doppio**, cioè il loop del BIOS sulla
+    console gira a ~15 Hz, non a 30. Torna con le letture dei pad lente (33,86 ms per le
+    10 letture col clock di MAME = più di un frame).
+  - Ma non basta rallentare l'I2C: a 27 MHz in Flick il jingle tace e l'animazione resta
+    a 113 frame; con CPI 2-6 va da 113 a 139 frame, il periodo degli impulsi resta 44
+    frame. Nel modello c'è un errore su come il BIOS aspetta (vblank, I2C, riempimento del
+    FIFO) non ancora trovato: serve leggere il loop principale del BIOS.
+  - Come si è misurato (script usa e getta, non nel repo): decodifica dei 6 KVAG del BIOS
+    (IMA ADPCM, nibble alto prima) e log per frame di luminosità ed eventi DAC in una
+    copia strumentata. Altri campioni: 0xA007C9E0
+    (stereo 11025 Hz, tre colpi) suonato da `0xA0010CD8` ogni 19 tick, altra schermata.
+  - **Confermato dall'utente sul vero: circa 2,5 s tra un picco e l'altro del logo
+    ("forse un filino meno").** Resta da misurare il tempo della palla di PONG da lato a
+    lato (attesi 2,5-3,5 s; da chiedere a ppcasm).
+  - **Prossimo lavoro, dopo la 0.1.4:** leggere il loop principale del BIOS e trovare
+    l'errore nel modello; I2C lento da solo non va (vedi sopra). Nei problemi noti del
+    README fino ad allora.
 - **Da fare:** pulsante USB nella toolbar e scelta del file dalla finestra (oggi solo
   trascinamento e `--usb`); cartella dell'host come chiavetta, senza passare da `mkusb.py`;
   la ISO vera dell'utente Reddit quando arriva.
