@@ -247,4 +247,9 @@ void tv_write(uint32_t off, uint32_t data, uint32_t mask)
 
 void tv_buffer_ctrl_w(uint32_t data)        { s_tve_buffer_ctrl = data & 3; }
 uint32_t tv_start_addr_r(int n)             { return s_tv_start_addr[n]; }
-void tv_start_addr_w(int n, uint32_t data, uint32_t mask) { COMBINE(s_tv_start_addr[n], data, mask); }
+void tv_start_addr_w(int n, uint32_t data, uint32_t mask)
+{
+	const uint32_t old = s_tv_start_addr[n];
+	COMBINE(s_tv_start_addr[n], data, mask);
+	if (s_tv_start_addr[n] != old) hs_log("tv: frame buffer %d at %08x\n", n + 1, s_tv_start_addr[n]);
+}

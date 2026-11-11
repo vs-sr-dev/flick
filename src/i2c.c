@@ -51,12 +51,13 @@ static void i2c_update(void *ctx, int param)
 	// I2C ack
 	s_config |= (s_config & 7) << 3;
 
-	// I2C IRQ
+	/* End of transfer: the flag, and the IRQ if enabled. MAME raises the flag only with
+	 * the IRQ enabled; the console raises it either way, as the homebrew SDK's I2C_Read8
+	 * shows: it never enables the IRQ and polls the flag (the BIOS and the games enable
+	 * it, so nothing changes for them). */
+	s_irq_control |= 0x01;
 	if (s_irq_control & 0x02)
-	{
-		s_irq_control |= 0x01;
 		score7_set_input(IRQ_I2C);
-	}
 }
 
 void i2c_init(void)

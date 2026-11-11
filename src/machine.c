@@ -51,6 +51,12 @@ uint32_t io_read32(uint32_t a, uint32_t mask)
 		if (off == 0x6c) return 0x01;        // MIU status: SDRAM is in self-refresh mode
 		return 0;
 	case 0x08130000: return i2c_read(off);
+	case 0x08150000:
+		/* UART status: nothing received, transmitter idle (0x10 RX FIFO empty, 0x80 TX
+		 * FIFO empty). Homebrew waits for the idle transmitter before each character.
+		 * Unmapped in MAME, where it reads 0: so it does while tracing, to compare. */
+		if (off == 0x10 && !g_trace) return 0x90;
+		return 0;
 	case 0x08160000:
 		if (off < 0x6000) return timer_read(off >> 12, off & 0xfff);
 		return 0;
