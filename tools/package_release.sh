@@ -1,6 +1,6 @@
 #!/bin/bash
-# Windows release package: dist/flick-<version>-win64.zip with flick.exe, SDL2.dll, the README
-# and the licences. A clean Release build in build-release/ with the version suffix removed.
+# Windows release package: dist/flick-<version>-win64.zip with flick.exe, SDL2.dll, the README,
+# the licences and tools/mkusb.py. A clean Release build in build-release/ with the version suffix removed.
 # Needs MSYS2 mingw64 (gcc, cmake, ninja, SDL2) and a Python (only its zipfile module).
 # Refuses to package uncommitted changes unless ALLOW_DIRTY=1.
 set -e
@@ -29,6 +29,8 @@ strip "$OUT/flick.exe"
 cp "$MINGW/bin/SDL2.dll" "$OUT/"
 cp README.md LICENSE THIRD_PARTY_NOTICES.md "$OUT/"
 cp "$MINGW/share/licenses/SDL2/LICENSE.txt" "$OUT/LICENSE-SDL2.txt"
+mkdir -p "$OUT/tools"                 # at the path the README gives
+cp tools/mkusb.py "$OUT/tools/"
 
 (cd dist && "$PY" -m zipfile -c "$NAME.zip" "$NAME")
 echo "dist/$NAME.zip ($(git rev-parse --short HEAD))"

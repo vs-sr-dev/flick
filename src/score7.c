@@ -18,6 +18,7 @@
 #include "bus.h"
 #include "trace.h"
 #include "sched.h"
+#include "usb.h"
 
 score7_t g_cpu;
 uint32_t g_mark_pc = 1;      /* odd: never matches */
@@ -1370,6 +1371,12 @@ void score7_flush_inputs(void)
 
 void score7_step(void)
 {
+	/* a USB stick is attached: the firmware's USB driver is answered from the image */
+	if (g_usb_hle && (m_pc | 0x20000000u) - USB_HLE_FIRST <= USB_HLE_LAST - USB_HLE_FIRST && usb_hle())
+	{
+		g_cpu.cycles += g_cpu.cpi;
+		return;
+	}
 	m_ppc = m_pc;
 	if (g_trace) trace_begin();
 

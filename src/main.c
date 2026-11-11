@@ -20,6 +20,7 @@
 #include "os.h"
 #include "dump.h"
 #include "config.h"
+#include "usb.h"
 #ifdef HS_HAVE_SDL
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -79,6 +80,8 @@ static void usage(void)
 		"  --cd FILE          disc image: .cue (one BINARY file) or .iso\n"
 		"  --card FILE        RFID card image (120 bytes) on the reader from the start\n"
 		"  --quickload FILE   run a HYPER.EXE directly, as MAME's quickload (homebrew)\n"
+		"  --usb FILE         USB stick image (raw, FAT32) for homebrew that reads one;\n"
+		"                     written in place. In the window: drop a .img on it\n"
 		"  --card-at T:ID     place catalogue card ID (e.g. xmen001) on the reader at T s\n"
 		"  --cards-dir DIR    where cards placed from the F1 panel keep their saves\n"
 		"                     (default: the cards folder next to the executable)\n"
@@ -141,6 +144,16 @@ static int quickload_apply(void)
 	fclose(f);
 	g_cpu.pc = 0xa0091000;
 	return n > 0;
+}
+
+/* --usb FILE, or an image dropped on the window: NULL if attached, else why not. The
+ * stick is answered at the firmware's USB driver, whose addresses are those of the known
+ * BIOS dump (usb.h). */
+static const char *usb_attach_checked(const char *path)
+{
+	if (machine_bios_crc() != BIOS_CRC32)
+		return "USB sticks need the known HyperScan BIOS dump (CRC32 ce346a14)";
+	return usb_attach(path) ? NULL : "Cannot open the USB stick image";
 }
 
 /* --cpi-at T:N: switch the CPI at emulated time T (timing experiments) */
@@ -282,6 +295,25 @@ static void open_disc(SDL_Window *win, const char *path)
 	snprintf(m, sizeof(m), "Disc: %s", base_name(path));
 	ui_toast(m);
 	dir_name(path, g_config.disc_dir, sizeof(g_config.disc_dir));
+}
+
+static int has_ext(const char *path, const char *ext)
+{
+	const size_t n = strlen(path), e = strlen(ext);    /* ext: lower case, with the dot */
+	if (n < e) return 0;
+	for (size_t i = 0; i < e; i++)
+		if ((path[n - e + i] | 0x20) != ext[i]) return 0;
+	return 1;
+}
+
+/* a USB stick image dropped on the window: plugged in as it is, the program that reads
+ * it finds it at its next attempt (homebrew usually waits for the stick) */
+static void open_usb(const char *path)
+{
+	char m[300];
+	const char *why = usb_attach_checked(path);
+	if (!why) snprintf(m, sizeof(m), "USB stick: %s", base_name(path));
+	ui_toast(why ? why : m);
 }
 
 static long file_size(const char *path)
@@ -694,7 +726,8 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 				g_quit = 1;
 				break;
 			case SDL_DROPFILE:
-				open_disc(win, ev.drop.file);
+				if (has_ext(ev.drop.file, ".img")) open_usb(ev.drop.file);
+				else open_disc(win, ev.drop.file);
 				SDL_free(ev.drop.file);
 				break;
 			case SDL_WINDOWEVENT:
@@ -839,7 +872,7 @@ static int run_window(uint64_t end_cycle, uint64_t frames, const char *cdpath, i
 
 int main(int argc, char **argv)
 {
-	const char *bios = NULL, *shot = NULL, *wav = NULL, *render_dump = NULL, *dump_dir = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL;
+	const char *bios = NULL, *shot = NULL, *wav = NULL, *render_dump = NULL, *dump_dir = NULL, *trace = NULL, *cdpath = NULL, *cardpath = NULL, *cardsdir = NULL, *usbpath = NULL;
 	int headless = 0, cpi = 0, io_cycles = 0, fast = -1, field_vblank = 0;
 	double seconds = 0;
 	uint64_t frames = 0;
@@ -854,6 +887,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--cd")) cdpath = NEXT();
 		else if (!strcmp(a, "--card")) cardpath = NEXT();
 		else if (!strcmp(a, "--quickload")) snprintf(s_quickload, sizeof(s_quickload), "%s", NEXT());
+		else if (!strcmp(a, "--usb")) usbpath = NEXT();
 		else if (!strcmp(a, "--cards-dir")) cardsdir = NEXT();
 		else if (!strcmp(a, "--card-at"))
 		{
@@ -939,6 +973,15 @@ int main(int argc, char **argv)
 		snprintf(bios_warning, sizeof(bios_warning), "BIOS: not the known HyperScan dump (CRC32 %08x, "
 			"expected %08x)", machine_bios_crc(), BIOS_CRC32);
 		fprintf(stderr, "warning: %s\n", bios_warning);
+	}
+	if (usbpath)
+	{
+		const char *why = usb_attach_checked(usbpath);
+		if (why)
+		{
+			report("%s: %s", why, usbpath);
+			return 1;
+		}
 	}
 	if (fast < 0) fast = headless ? 1 : g_config.fast;   /* scripts get the same default every time */
 	if (cdpath && !(s_cd = cdimg_open(cdpath)))

@@ -16,7 +16,7 @@ option(HS_SDL "Build the SDL2 frontend (window, input)" ON)
 
 add_executable(flick
   src/main.c src/machine.c src/bus.c src/sched.c src/score7.c src/trace.c
-  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c src/cards.c src/cardlist.c src/font.c src/ui.c src/toolbar.c src/os.c src/dump.c src/config.c src/controls.c)
+  src/timer.c src/i2c.c src/screen.c src/ppu.c src/png.c src/cdservo.c src/cdimg.c src/input.c src/spu.c src/card.c src/cards.c src/cardlist.c src/font.c src/ui.c src/toolbar.c src/os.c src/dump.c src/config.c src/controls.c src/usb.c)
 target_compile_definitions(flick PRIVATE HS_VERSION="${FLICK_VERSION}")
 target_compile_options(flick PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-type-limits)
 if(WIN32)

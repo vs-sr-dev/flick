@@ -1,6 +1,6 @@
 #!/bin/bash
 # Linux release package: dist/flick-<version>-linux-x86_64.tar.gz with the flick binary, the
-# README and the licences. Run it on Linux (WSL works): a clean Release build in build-linux/
+# README, the licences and tools/mkusb.py. Run it on Linux (WSL works): a clean Release build in build-linux/
 # with the version suffix removed. Needs gcc, cmake, pkg-config and libsdl2-dev; the binary
 # uses the system's SDL2 (libsdl2-2.0-0) and glibc 2.34 or later, as built on Ubuntu 24.04.
 # Refuses to package uncommitted changes unless ALLOW_DIRTY=1.
@@ -28,6 +28,9 @@ strip "$STAGE/$NAME/flick"
 cp README.md LICENSE THIRD_PARTY_NOTICES.md res/flick.png "$STAGE/$NAME/"
 chmod 644 "$STAGE/$NAME"/*
 chmod 755 "$STAGE/$NAME" "$STAGE/$NAME/flick"
+mkdir "$STAGE/$NAME/tools"            # at the path the README gives
+cp tools/mkusb.py "$STAGE/$NAME/tools/"
+chmod 755 "$STAGE/$NAME/tools" "$STAGE/$NAME/tools/mkusb.py"
 
 mkdir -p dist
 rm -f "dist/$NAME.tar.gz"
