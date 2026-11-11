@@ -239,6 +239,12 @@ static inline int16_t clip16(int32_t v)
 	return v > 32767 ? 32767 : v < -32768 ? -32768 : (int16_t)v;
 }
 
+/* The FIFO switched off in the middle of a sound (the BIOS stops its boot jingle a moment
+ * before the sample ends): the output does not drop to zero in one step, which clicks, but
+ * settles there in about 15 ms, as an AC-coupled output does. */
+static float s_fifo_hold_l, s_fifo_hold_r;
+#define FIFO_RELEASE 0.995f        /* per output sample */
+
 static void stream_render(uint32_t n)
 {
 	const float master = (float)(m_main_vol & 0x7f) / 127.0f;
@@ -264,9 +270,18 @@ static void stream_render(uint32_t n)
 			dac_l = m_ring[slot + 0];
 			dac_r = m_ring[slot + 1];
 			m_ring_frac += fifo_step;
+			s_fifo_hold_l = (float)dac_l;
+			s_fifo_hold_r = (float)dac_r;
 		}
 		else
 		{
+			if (s_fifo_hold_l != 0.0f || s_fifo_hold_r != 0.0f)
+			{
+				dac_l = (int32_t)s_fifo_hold_l;
+				dac_r = (int32_t)s_fifo_hold_r;
+				s_fifo_hold_l = fabsf(s_fifo_hold_l) < 1.0f ? 0.0f : s_fifo_hold_l * FIFO_RELEASE;
+				s_fifo_hold_r = fabsf(s_fifo_hold_r) < 1.0f ? 0.0f : s_fifo_hold_r * FIFO_RELEASE;
+			}
 			mix_l += m_wave_in_l;
 			mix_r += m_wave_in_r;
 		}
@@ -449,6 +464,7 @@ void spu_init(void)
 	m_wave_addr = m_wave_addr_hi = m_soft_phase = m_soft_ctrl = m_wave_pos = m_dac_half = 0;
 	m_dac_rate = m_dac_half_frames = 0;
 	m_dac_stereo = m_dma_on = 0;
+	s_fifo_hold_l = s_fifo_hold_r = 0.0f;
 	m_ring_head = m_ring_tail = m_ring_frac = 0;
 	m_ctrl_flags = m_main_vol = m_ch_enable = m_ch_stop = 0;
 	memset(m_regs, 0, sizeof(m_regs));
