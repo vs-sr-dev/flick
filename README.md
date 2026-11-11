@@ -107,6 +107,31 @@ Linux that holds when Flick is unpacked in a folder you can write to; otherwise 
 system-wide, say) `flick.ini` goes in `~/.config/flick/` and the rest in
 `~/.local/share/flick/`.
 
+## Homebrew
+
+Programs made with ppcasm's [HyperScan SDK](https://github.com/ppcasm/HyperScan-SPG29x-SDK)
+start like the games: from a disc image with `HYPER.EXE` in its root. `--quickload` runs a
+`HYPER.EXE` with no disc and no BIOS.
+
+Some of them read a **USB stick** (the console has a USB port the games never use): DOOM
+keeps its WAD there, and the SDK's USB loader starts the programs in the stick's `apps`
+folder. Flick takes the stick as an image file, a raw dump with a FAT32 volume:
+
+    flick --usb stick.img loader.iso
+
+or drop the `.img` on the window; a program waiting for the stick finds it at once. What
+the program writes (DOOM's settings and saved games) goes into the image.
+[tools/mkusb.py](tools/mkusb.py) makes an image from a folder:
+
+    python tools/mkusb.py stick-folder stick.img
+
+File names must be 8.3 (`DOOM1.WAD`): the SDK cannot open longer ones. The layout the
+SDK's programs expect is `apps/NAME/hyper.exe` for the loader and, for DOOM, `doom1.wad`
+in the root and an `apps` folder for it to make `apps/doom` in.
+
+The SDK's examples run: Hello World, the controller demo, PONG, the USB loader's CD
+version and DOOM, started from the loader or from its own disc.
+
 ## Known issues
 
 - **Loading times** follow MAME's CD drive, which answers instantly; the real console
@@ -135,6 +160,10 @@ Then it departs from MAME where MAME is wrong for playing:
   time it takes the host. **F3** (`--timing mame`) switches to MAME's timing, cycle for cycle.
 - **Video.** The 640x240 mode starts 8 lines into the layers, which makes Ben 10's split
   screen clean.
+- **Homebrew.** The USB stick is answered at the firmware's USB driver, four entry points
+  at fixed addresses that the SDK calls, rather than by emulating the USB host controller.
+  The I2C block raises its end-of-transfer flag with the interrupt disabled too, and the
+  UART reports an idle transmitter: the SDK polls both, and MAME leaves them at zero.
 
 The milestones ahead: a timing model fitted to the real console (loading times, CD seeks),
 then a boot without the BIOS. The original analysis is in [RECON.md](RECON.md) (in Italian),
@@ -150,6 +179,7 @@ the running list in [TODO.md](TODO.md).
 | `--cd FILE` | disc image: `.cue` with one BINARY file (MODE1/2352, MODE1/2048, AUDIO tracks) or `.iso` |
 | `--card FILE` | a 120-byte card image on the reader from the start |
 | `--quickload FILE` | run a `HYPER.EXE` directly, as MAME's quickload does (homebrew such as [hs-lba](https://github.com/vs-sr-dev/hs-lba)); the BIOS does not run |
+| `--usb FILE` | USB stick image for homebrew that reads one (see [Homebrew](#homebrew)); written in place |
 | `--card-at T:ID` | place catalogue card ID (e.g. `xmen001`) at T seconds |
 | `--cards-dir DIR` | where written cards are saved (default `cards/`, see [Settings](#settings)) |
 | `--headless` | no window, no sound |

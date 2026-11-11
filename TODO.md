@@ -2,6 +2,41 @@
 
 Contesto: [RECON.md](RECON.md) (ricognizione), [README.md](README.md) (stato e uso).
 
+## Sessione del 2026-11-11: homebrew dell'SDK di ppcasm, chiavetta USB
+
+Spunto: su Reddit l'autore del DOOM per HyperScan segnala schermo nero col suo homebrew
+(ISO sua non ancora arrivata; riprodotto col DOOM precompilato dell'SDK).
+
+- **Chiavetta USB** (`src/usb.c`, `--usb FILE`, `.img` trascinato sulla finestra): l'SDK
+  non tocca il controller USB host (0x081C, non mappato), chiama il driver del BIOS in RAM
+  a 4 indirizzi fissi (`DrvUSBH_Initial` 0xA001E5D4, `LUNInitial` 0xA001E9E4, `ReadSector`
+  0xA001EEE8, `WriteSector` 0xA001EFCC). Con un'immagine attaccata `score7_step` risponde
+  lì (settori da/verso il file, tempo emulato zero); senza, il BIOS gira com'è e non trova
+  nulla, e DOOM resta in `while(DiskB_Initial());` prima di `TV_Init` = lo schermo nero.
+  Solo col BIOS noto (CRC). `tools/mkusb.py CARTELLA OUT.img` fa l'immagine (MBR + FAT32,
+  nomi 8.3: il FatFS dell'SDK è senza LFN).
+- **I2C:** il flag di fine trasferimento si alza anche con l'IRQ disabilitato (MAME: solo
+  se abilitato). `I2C_Read8` dell'SDK non abilita l'IRQ e aspetta il flag: DEMO, PONG e
+  FlashRecovery restavano lì. BIOS e giochi l'IRQ lo abilitano: tracce invariate.
+- **UART:** lo stato (0x08150010) legge 0x90 (RX vuoto, TX vuoto) invece di 0; con `--trace`
+  resta 0 come MAME, perché il BIOS lo legge a ogni carattere e le tracce divergerebbero.
+  Serve a `print_string` dell'SDK e a `uart_loader` (che poi aspetta un binario dalla
+  seriale: lì si ferma, giustamente).
+- **Provati** (ISO con solo `HYPER.EXE`, avviate dal BIOS): HelloWorld, DEMO, PONG,
+  FlashRecovery (schermata dell'installer, non eseguito), USBLoaderCD (menu delle app in
+  `/apps` della chiavetta, pad, avvio di `/apps/NOME/hyper.exe`), DOOM (dal suo disco e dal
+  loader, WAD shareware, crea `apps/doom/savegame` sull'immagine). `USB/USBLoader` no: è
+  linkato a 0xA0E01000, è il payload che il CFW carica da USB, non un `Hyper.Exe` da CD.
+- **Aperto, da chiedere a ppcasm:** il DOOM dell'SDK passa `&DG_ScreenBuffer` (indirizzo
+  del puntatore, 0xA0101EE4) a `TV_Buffer_Set` invece del buffer (0xA0107728): in Flick
+  (che qui usa l'indirizzo così com'è, come il codice di MAME; MAME non provato) l'immagine
+  esce 35 righe più in basso e 98 pixel a destra, col bordo che rientra da sinistra. Sulla
+  console vera è uguale? Se no, il registro dell'indirizzo del frame buffer fa qualcosa che
+  non sappiamo. Dal sorgente, DOOM non legge il pad (gira solo la demo).
+- **Da fare:** pulsante USB nella toolbar e scelta del file dalla finestra (oggi solo
+  trascinamento e `--usb`); cartella dell'host come chiavetta, senza passare da `mkusb.py`;
+  la ISO vera dell'utente Reddit quando arriva.
+
 ## Sessione del 2026-10-18: Flick è pubblico
 
 - **Nome Flick**, icona, `flick.ini`, avvio senza argomenti, exe GUI, pannello dei controlli
