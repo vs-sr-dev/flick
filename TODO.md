@@ -62,9 +62,55 @@ Spunto: su Reddit l'autore del DOOM per HyperScan segnala schermo nero col suo h
   - **Confermato dall'utente sul vero: circa 2,5 s tra un picco e l'altro del logo
     ("forse un filino meno").** Resta da misurare il tempo della palla di PONG da lato a
     lato (attesi 2,5-3,5 s; da chiedere a ppcasm).
-  - **Prossimo lavoro, dopo la 0.1.4:** leggere il loop principale del BIOS e trovare
-    l'errore nel modello; I2C lento da solo non va (vedi sopra). Nei problemi noti del
-    README fino ad allora.
+  - **Letto il loop del BIOS (dopo la 0.1.4). Ipotesi forte: sulla console l'interrupt
+    "vblank" della PPU (0x88010084 bit 0) nel logo arriva ogni ~58 ms (3,5 semiquadri),
+    non a ogni frame.** I fatti nel codice del BIOS:
+    - `WaitVBlank` (0xA001528C): aspetta che il contatore di frame (gp-15468, +1 a ogni
+      IRQ PPU bit 0, handler 0xA000C4D0 -> 0xA001513C) cambi rispetto all'ultimo visto, e
+      **solo mentre aspetta** chiama il servizio audio (0xA000A0A8 -> 0xA000AEC0, che
+      decodifica il blocco successivo del jingle; il FIQ del DAC copia nel FIFO il blocco
+      pronto e ne chiede un altro: serve una chiamata ogni 46 ms).
+    - `pad_poll` (0xA0019114): attesa a vuoto `while (stato != 0);` (0xA0019254) che la
+      catena di 10 letture I2C (a interrupt, 0xA0018C60) finisca, poi la rilancia
+      (0xA0019000). Se la catena dura più di un periodo di IRQ, ogni giro contiene un IRQ,
+      `WaitVBlank` non aspetta mai e l'audio non viene più servito (stato assorbente): è
+      il jingle muto col clock I2C di MAME. Quindi sulla console la catena dura meno del
+      periodo dell'IRQ, e il giro del BIOS = un periodo dell'IRQ.
+    - Passo del logo (0xA000F870): contatore += 2 a giro (+2 se è premuto il tasto bit 6
+      dei pad: raddoppia la velocità); luminosità = onda triangolare di periodo 128/3 =
+      42,7 giri; jingle a contatore 66, fine a 280 (107 giri).
+    - 42,7 giri in ~2,5 s (misura dell'utente sul vero) = 58 ms a giro. **Prova (copia
+      strumentata, `HS_PPU_FIELDS=3,4`): con l'IRQ ogni 3 e 4 semiquadri alternati i
+      picchi visivi cadono a +1,22, +3,75, +6,32 s e i tre "zzzmmm" a 1,35, 3,85, 6,35 s:
+      tre suoni in sincrono, come sul vero.** Con 4,4 (un IRQ ogni 2 frame) i picchi
+      vanno a 2,9 s l'uno e si sfasano; con 3,3 a 2,15 s.
+    - **Corretto dall'utente dopo la prova a finestra: sul vero il terzo suono NON viene
+      tagliato; parte un po' prima rispetto all'impulso, più dei precedenti, e finisce
+      appena prima del LOADING.** È il quadro a 4 semiquadri (2 frame, 66,7 ms, 15
+      immagini al secondo), non a 3,5: finestra del jingle 7,20 s, picchi visivi a +1,42,
+      +4,29, +7,22, suoni udibili +0,84..2,34, +3,34..4,89, +5,84..7,24 (il terzo intero,
+      finisce col logo; anticipo sul picco 0,58, 0,95, 1,38 s). A 3,5 il terzo è tagliato
+      a +6,31. Gli impulsi sarebbero allora a 2,87 s l'uno (l'utente aveva stimato ~2,5 a
+      occhio): da ricontrollare su un video contando i fotogrammi.
+    - **Confermato dall'utente a finestra (4 semiquadri + rilascio): "equivalente al
+      vero", il terzo suono finisce giusto.** Il "pzzt" residuo era il gradino allo
+      spegnimento del DAC (il BIOS ferma il jingle a 107 giri = 7,14 s, a ~1,97 s dentro
+      il terzo campione, livello ~26%): ora l'uscita del FIFO scende a zero in ~15 ms
+      (`FIFO_RELEASE` in spu.c, **nel codice**; nei giochi cambia solo quei 36 ms).
+      Latenza audio di Flick dall'accensione del DAC: 233 ms = 5 mezzi buffer, di cui
+      uno (46 ms) è il cuscinetto dell'anello; il resto è la logica del BIOS.
+    - Primo confronto dei registri PPU: nel logo sono accesi **due layer a tutto schermo
+      (tx0 0x100b, tx1 0x18b con blend che varia) e 511 sprite**; nelle schermate di
+      X-Men un layer o nessuno e al massimo 100 sprite. Pista per il modello: costo =
+      pixel dei layer accesi (+ blend, + sprite), periodo = frame interi necessari.
+      Mancano i registri durante i combattimenti (serve uno script di input fino lì).
+    - Lettura: la PPU dell'SPG290 compone l'immagine in un buffer e ci mette più di un
+      frame quando la scena è pesante (640x480 con sfumatura a tutto schermo nel logo);
+      MAME e Flick danno un IRQ per frame fisso. Non è la risoluzione da sola: X-Men a
+      640x480 combatte a 30 fps sul vero. Serve un modello del tempo di composizione,
+      da tarare su scene misurate sul vero (logo 58 ms, combattimenti di X-Men 33 ms).
+    - Ne discende che anche l'I2C va rivisto con dati veri (PONG): i 108 MHz non sono
+      giustificati dal jingle; resta solo il vincolo catena < periodo dell'IRQ nel BIOS.
 - **Da fare:** pulsante USB nella toolbar e scelta del file dalla finestra (oggi solo
   trascinamento e `--usb`); cartella dell'host come chiavetta, senza passare da `mkusb.py`;
   la ISO vera dell'utente Reddit quando arriva.
